@@ -22,7 +22,6 @@ eye.z = zoomZ * Math.cos(angleY) * Math.cos(angleX);
 
 //Texture
 var textures;
-var objattrtex;
 
 //Vertex Shader
 var VertexLocation;
@@ -35,16 +34,8 @@ var u_eyeLocation;
 var u_timeLocation;
 var u_itrLocation;
 var u_textureLocation;
-var u_attrtextureLocation;
 var u_texsizeLocation;
-var u_attrtexsizeLocation;
 var u_texLocations = [];
-
-//Added for attrtexture
-//width and height must be pow(2,n)
-var attw = 1024;  //width
-var atth = 2; //height
-var attributes = new Uint8Array(attw * atth * 4);
 
 //render shader
 var renderProgram;
@@ -110,7 +101,6 @@ function initBuffers() {
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 	gl.vertexAttribPointer(VertexLocation, 2, gl.FLOAT, false, 0, 0);
 
-
 	frameBuffer = gl.createFramebuffer();
 	var type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
 
@@ -122,12 +112,6 @@ function initBuffers() {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, canvas.width, canvas.height, 0, gl.RGB, type, null);
 	}
-	gl.bindTexture(gl.TEXTURE_2D, null);
-
-	objattrtex = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_2D, objattrtex);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
@@ -162,19 +146,15 @@ function initializeShader() {
 	u_numsLocation = gl.getUniformLocation(shaderProgram, "objnums");
 	u_eyeLocation = gl.getUniformLocation(shaderProgram, "cameraPos");
 
-
 	u_textureLocation = gl.getUniformLocation(shaderProgram, "texture");
-	u_attrtextureLocation = gl.getUniformLocation(shaderProgram, "attrtexture");
 	u_texsizeLocation = gl.getUniformLocation(shaderProgram, "texsize");
-	u_attrtexsizeLocation = gl.getUniformLocation(shaderProgram, "attrtexsize");
 }
 
 function animate() {
 	
 	message.innerHTML = "Iterations: " + (iterations).toString();
 
-	if (!pause || iterations == 0)
-	{
+	if (!pause || iterations == 0) {
 		///////////////////////////////////////////////////////////////////////////
 		// Render
 		gl.useProgram(shaderProgram);
@@ -198,27 +178,19 @@ function animate() {
 		gl.uniform3f(u_eyeLocation, eye.x, eye.y, eye.z);
 		gl.uniform1f(u_timeLocation, time);
 		gl.uniform1f(u_itrLocation, iterations);
+
 		//Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
-		gl.uniform2f(u_attrtexsizeLocation, attw, atth);
 
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
 		gl.uniform1i(u_textureLocation, 0);
-
-
-		gl.activeTexture(gl.TEXTURE1);  //attributes for objects
-		gl.bindTexture(gl.TEXTURE_2D, objattrtex);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, attw, atth, 0, gl.RGBA, gl.UNSIGNED_BYTE, attributes);
-		gl.uniform1i(u_attrtextureLocation, 1);
-
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textures[1], 0);
 		gl.vertexAttribPointer(VertexLocation, 2, gl.FLOAT, false, 0, 0);
 		
-
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -249,13 +221,6 @@ function resize() {
 
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, canvas.width, canvas.height, 0, gl.RGB, type, null);
-	
-	gl.bindTexture(gl.TEXTURE_2D, textures[1]);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
