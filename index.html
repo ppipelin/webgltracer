@@ -68,20 +68,26 @@
 		<br>
 		Not supported on phones.
 	</p>
-	<input type="button" class="finger bae-rock hella" value="Raytracing" onclick="change_render_mode(0.0); document.getElementById('raytracingshadow').checked = false;" />
-	<div class="custom-control custom-switch" id="raytracingshadow_dad">
-		<input type="checkbox" class="custom-control-input" id="raytracingshadow" onclick="change_render_mode(document.getElementById('raytracingshadow').checked ? 1.0:0.0);" checked>
-		<label class="custom-control-label" for="raytracingshadow">Shadowing</label>
+	<input type="button" class="finger bae-rock hella" value="Raytracing" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1.0:0.0)" />
+	<div class="custom-control custom-switch" id="raytracing_shadow_dad">
+		<input type="checkbox" class="custom-control-input" id="raytracing_shadow" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1.0:0.0);" checked>
+		<label class="custom-control-label" for="raytracing_shadow">Shadowing</label>
 	</div>
 
-	<input class="finger bae-retro hella" type="button" value="Path Tracing" onclick="change_render_mode(2.0);" />
+	<input class="finger bae-rock hella" type="button" value="Path Tracing" onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3.0:2.0);" />
+	<div class="custom-control custom-switch" id="pathtracing_naive_dad">
+		<input type="checkbox" class="custom-control-input" id="pathtracing_naive" onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3.0:2.0);">
+		<label class="custom-control-label" for="pathtracing_naive">Naive</label>
+	</div>
+	<br>
+
 
 	<canvas id='canvas' width='512' height='512'></canvas>
 	<div id="message"></div>
 	<div id = "time"></div>
 	<br>
 	<ul>
-		<li>Path tracing</li>
+		<li>Path tracing -- Naive OK, Iterative WIP --> Light sampling method seems to introduce bias</li>
 		<li>Lambert with different samplers</li>
 		<li>Light tracing</li>
 		<li>Moving Cam</li>
@@ -151,7 +157,8 @@
 	#define HALF_PI 1.5707963268
 	#define TWO_PI 6.28318530718
 	#define FOUR_PI 12.56637061436
-	#define PATHS_NB 500.0
+	// #define PATHS_NB 500.0
+	#define PATHS_NB 1000000.0
 	
 	// Benchmark options
 	float seed;
@@ -167,10 +174,11 @@
 
 	// Rendering parameters
 	#define MAX_DEPTH 5
-	#define SPPPF 1
+	#define SPPPF 2
 	#define RUSSIAN_ROULETTE
 	#define WEIGHTS_VISUALIZATION 3
-	const float epsilon = scene_scale * 0.005;
+	// const float epsilon = scene_scale * 0.005; // OLD
+	const float epsilon = scene_scale * 0.0001;
 
 	// END_VARIABLES
 
@@ -198,7 +206,7 @@
 		vec3 albedo; // Loss of energy or not
 		vec3 emissive;
 		float shininess;
-		// int bsdf_number; // 0 is lambert
+		int bsdf_number; // 0 is lambert
 		// int sampler_number;
 	};
 		
@@ -244,7 +252,7 @@
 		
 	struct DirectionSample{
 		float pdf;
-		vec3 bsdf;
+		float bsdf;
 		vec3 direction;
 	};
 		
@@ -261,6 +269,10 @@
 	// END_STRUCTURES
 
 	// FUNCTIONS GEOMETRY
+	bool sameHemisphere(vec3 w, vec3 wp) {
+		return dot(w, wp) >= epsilon;
+	}
+
 	bool samePoint(vec3 a, vec3 b){
 		return length(a - b) <= epsilon;
 	}
@@ -277,7 +289,7 @@
 			  + 2.0 * s * cross(u, v);
 	}
 
-	vec3 rotate(vec3 axis, float angle, vec3 v){
+	vec3 rotate(vec3 axis, float angle, vec3 v) {
 		float s = sin(angle * 0.5);
 		vec3 u = axis * s;
 		float w = cos(angle * 0.5);
@@ -285,13 +297,21 @@
 		return 2.0 * dot(v, u) * u +
 			   (w*w  - dot(u,u)) * v +
 			   2.0 * w * cross(u, v);
+	}
+	
+	vec3 sphericalToCartesian(vec2 spherical) {
+		return vec3(sin(spherical.x) * cos(spherical.y), sin(spherical.x) * sin(spherical.y), cos(spherical.x));
+	}
 
+	vec2 cartesianToSpherical(vec3 cartesian) {
+		float x = cartesian.x;
+		float y = cartesian.y;
+		float z = cartesian.z;
+
+		return vec2(pow(atan(y,x), 2.0), atan(sqrt(x*x + y*y)) / z); // WARN: not sure about atan2 being powered
 	}
-	vec3 polarToCartesian(vec2 polar){
-		return vec3(sin(polar.x) * cos(polar.y), sin(polar.x) * sin(polar.y), cos(polar.x));
-	}
-	mat3 rotationMatrix(vec3 axis, float angle)
-	{
+
+	mat3 rotationMatrix(vec3 axis, float angle)	{
 		axis = normalize(axis);
 		float s = sin(angle);
 		float c = cos(angle);
@@ -301,7 +321,7 @@
 					oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s, 	oc * axis.z * axis.z + c		 );
 	}
 
-	Ray makeRay(vec2 uv, in Camera camera){
+	Ray makeRay(vec2 uv, in Camera camera) {
 		vec3 direction = camera.front - 
 			camera.right * (0.5 - uv.x) * camera.plane.x - 
 			camera.down * (0.5 - uv.y) * camera.plane.y;
@@ -309,8 +329,8 @@
 		return Ray(camera.position, normalize(direction));
 	}
 
-	Intersection inter_dummy(in Ray ray){
-		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0);
+	Intersection inter_dummy(in Ray ray) {
+		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0);
 		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
 	}
 
@@ -363,23 +383,45 @@
 
 	bool raySceneIntersection(in Ray ray, in Scene scene, inout Intersection inter){
 		for(int i = 0 ; i < MAXSPHERES ; ++i){
-			raySphereIntersection(ray, scene.spheres[i], inter, int(i));
+			if(i < scene.nbSpheres)
+			raySphereIntersection(ray, scene.spheres[i], inter, i);
 		}
 		for(int i = 0 ; i < MAXTRIANGLES ; ++i){
 			if(i < scene.nbTriangles)
-			rayTriangleIntersection(ray, scene.triangles[i], inter, int(i));
+			rayTriangleIntersection(ray, scene.triangles[i], inter, i);
 		}
 		return inter.hit;
 	}
+
 	bool visibility(in Ray ray, in Scene scene, vec3 point){
 		Intersection inter = inter_dummy(ray);
 		raySceneIntersection(ray, scene, inter);
-		return !inter.hit || samePoint(inter.point, point);
+		return inter.hit && samePoint(inter.point, point);
 	}
 
 	// FUNCTIONS MATERIALS
 	bool isEmissive(in Material mat){
 		return mat.emissive.r > 0.0 || mat.emissive.g > 0.0 || mat.emissive.b > 0.0;
+	}
+	
+	bool isColor(vec3 c) {
+		float treshold = 1000000000.0;
+		return (c.x >= 0.0 && c.x < treshold) && (c.y >= 0.0 && c.y < treshold) && (c.z >= 0.0 && c.z < treshold);
+	}
+
+	bool isBlack(vec3 c) {
+		return c.x <= 0.0 && c.y <= 0.0 && c.z <= 0.0;
+
+	}
+
+	float BSDF_lambert(in vec2 i, in vec2 o) {
+		return 1.0/PI;
+	}
+
+	float BSDF(in Material mat, in vec2 i, in vec2 o) {
+		if(mat.bsdf_number == 0)
+			return BSDF_lambert(i, o);
+		return 0.0;
 	}
 
 	// FUNCTIONS SCENE
@@ -396,7 +438,7 @@
 			if(k == scene.nbTriangles)
 			scene.triangles[k] = Triangle(fl, fr, br, material); // k is a constant
 			else if(k == scene.nbTriangles+1)
-		    scene.triangles[k] = Triangle(br, bl, fl, material);
+			scene.triangles[k] = Triangle(br, bl, fl, material);
 
 		scene.nbTriangles += 2;
 
@@ -441,7 +483,7 @@
 	void initCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r){
 		// Camera
 		rotation += delta_r;
-		vec3 front = polarToCartesian(rotation);
+		vec3 front = sphericalToCartesian(rotation);
 		vec3 right = normalize(cross(UP, front));
 		
 		position += front * delta_p.x;
@@ -451,9 +493,9 @@
 		vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
 		scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
 		
-		Material diffuse_white = Material(vec3(1), vec3(0), 0.0);
-		Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0);
-		Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0);
+		Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0);
+		Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0);
+		Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0);
 		
 		// Cornell
 		vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
@@ -461,32 +503,32 @@
 		float factor = 0.3;
 		
 		// Lights
-		Material mlight1 = Material(vec3(0), vec3(0,0.25,1), 0.0);
-		addSphere(center + scene_scale * vec3(0,0,2), scene_scale * factor, mlight1, scene);
+		Material mlight1 = Material(vec3(0), vec3(0,0.25,1), 0.0, 0);
+		addSphere(center + scene_scale * vec3(0,0,2), scene_scale * factor, mlight1, scene); // BLUE
 		
-		Material mlight2 = Material(vec3(0), vec3(1,1,0), 0.0);
-		addSphere(center + scene_scale * vec3(-1,-1.5 ,-1.75), scene_scale * 2.0 * factor, mlight2, scene);
+		Material mlight2 = Material(vec3(0), vec3(1,1,0), 0.0, 0);
+		addSphere(center + scene_scale * vec3(-1,-1.5 ,-1.75), scene_scale * 2.0 * factor, mlight2, scene); // YELLOW
 
-		Material mlight3 = Material(vec3(0), vec3(1,0,0.25), 0.0);
-		addSphere(center + scene_scale * vec3(0, 0, 0), scene_scale * 2.0 * factor, mlight3, scene);
+		Material mlight3 = Material(vec3(0), vec3(1,0,0.25), 0.0, 0);
+		addSphere(center + scene_scale * vec3(0, 0, 0), scene_scale * 2.0 * factor, mlight3, scene); // PINK
 		
 		// Spheres
-		Material msdiffp = Material(vec3(0.8,0.2,0.7), vec3(0), 0.0);
+		Material msdiffp = Material(vec3(0.8,0.2,0.7), vec3(0), 0.0, 0);
 		addSphere(center + scene_scale * vec3(1,-1,-1), scene_scale * factor * 3.0, msdiffp, scene);
 		
-		Material msdiffy = Material(vec3(1,1,0), vec3(0), 0.0);
+		Material msdiffy = Material(vec3(1,1,0), vec3(0), 0.0, 0);
 		addSphere(center + scene_scale * vec3(1,-3,2), scene_scale * factor * 7.0, msdiffy, scene);
 		
-		Material msgloss1 = Material(vec3(0.3,0.9,0.9), vec3(0), 10.0);
+		Material msgloss1 = Material(vec3(0.3,0.9,0.9), vec3(0), 10.0, 0);
 		addSphere(center + scene_scale * vec3(1,2,-1), scene_scale * factor * 5.0, msgloss1, scene);
 		
-		Material msspec1 = Material(vec3(1.0,0.5,0.3), vec3(0), 1000.0);
+		Material msspec1 = Material(vec3(1.0,0.5,0.3), vec3(0), 1000.0, 0);
 		addSphere(center + scene_scale * vec3(0,0,-8), scene_scale * factor * 20.0, msspec1, scene);
 		
-		Material msspec2 = Material(vec3(1.0,1.0,1.0), vec3(0), 50000.0);
+		Material msspec2 = Material(vec3(1.0,1.0,1.0), vec3(0), 50000.0, 0);
 		addSphere(center + scene_scale * vec3(5,5,5), scene_scale * factor * 20.0, msspec2, scene);
 		
-		Material msgloss2 = Material(vec3(1.0,0.0,0.7), vec3(0), 1.0);
+		Material msgloss2 = Material(vec3(1.0,0.0,0.7), vec3(0), 1.0, 0);
 		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 3.0, msgloss2, scene);
 	}
 
@@ -514,8 +556,73 @@
 		return fract(sin(dot(InitRay + seed, noise)) * 43758.5453 + seed);
 	}
 
+	vec3 sample_cosine(in vec3 normal, inout float pdf) {
+		float phi = rand1() * 2.0 * PI;
+		float theta = acos(sqrt(1.0 - rand1()));
+		float sintheta = sin(theta);
+		float costheta = cos(theta);
+		vec3 sampled = vec3(sintheta * cos(phi), sintheta * sin(phi), costheta);
+
+		if(!sameHemisphere(normal, sampled))
+			sampled *= -1.0;
+		pdf = costheta / PI;
+		return sampled;
+	}
+
+	void createCoordinateSystem(in vec3 normal, out vec3 Nt, out vec3 Nb) {
+		if (abs(normal.x) > abs(normal.y)) 
+			Nt = vec3(normal.z, 0, -normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z); 
+		else 
+			Nt = vec3(0, -normal.z, normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z); 
+		Nb = cross(normal, Nt); 
+	}
+
+	// https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
+	vec3 worldToLocal(in vec3 normal , vec3 dir) {
+		vec3 Nt, Nb;
+		createCoordinateSystem(normal, Nt, Nb);
+		return vec3(
+			dir.x * Nb.x + dir.y * normal.x + dir.z * Nt.x, 
+			dir.x * Nb.y + dir.y * normal.y + dir.z * Nt.y, 
+			dir.x * Nb.z + dir.y * normal.z + dir.z * Nt.z);
+	}
+
+	// not sure about this trick
+	vec3 localToWorld(vec3 dir) {
+		return worldToLocal(vec3(0,1,0), dir);
+	}
+
+	void sample_BSDF(in Intersection inter, inout DirectionSample ds){
+		vec3 old_dir_world = normalize(-inter.ray.direction);
+		vec2 old_dir_world_spherical = cartesianToSpherical(old_dir_world);
+
+		vec3 old_dir_local = worldToLocal(inter.normal, old_dir_world);
+		vec2 old_dir_local_spherical = cartesianToSpherical(old_dir_local);
+
+		if(inter.material.bsdf_number == 0) {
+			vec3 new_dir_local = sample_cosine(vec3(0,1,0), ds.pdf);
+			vec3 new_dir_world = localToWorld(new_dir_local);
+			// new_dir_world = new_dir_local;
+
+			ds.direction = new_dir_world;
+			ds.bsdf = BSDF_lambert(old_dir_local_spherical, cartesianToSpherical(new_dir_local));
+		}
+	}
+
+	void sample_BSDF_without_world_recalibration(in Intersection inter, inout DirectionSample ds){
+		vec3 old_dir = normalize(-inter.ray.direction);
+		vec2 old_dir_spherical = cartesianToSpherical(old_dir);
+
+		if(inter.material.bsdf_number == 0) {
+			vec3 new_dir = sample_cosine(inter.normal, ds.pdf);
+
+			ds.direction = new_dir;
+			ds.bsdf = BSDF_lambert(old_dir_spherical, cartesianToSpherical(new_dir));
+		}
+	}
+
 	//https://www.akalin.com/sampling-visible-sphere
-	void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls){
+	void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls) {
 		// get costheta and phi
 		vec3 main_direction = (viewer - sphere.position);
 		float d = length(main_direction);
@@ -579,6 +686,46 @@
 		return ( up * normal ) + ( cos(around) * over * perpendicularDirection1 ) + ( sin(around) * over * perpendicularDirection2 );
 	}
 
+	vec3 sampleAllLights(in Scene scene, in Intersection inter){
+		vec3 Li_all;
+		for (int k = 0; k < MAXSPHERES; ++k)
+			if(k <= scene.nbLightSpheres) {
+				for (int l = 0; l < MAXSPHERES; ++l)
+					if(l == scene.light_spheres[k]) {
+						SurfaceLightSample sls;
+						sampleSphereSA(inter.point, scene.spheres[l], sls);
+
+						float pdf_light = sls.pdf;// / float(scene.nbLightSpheres); // not sure if needed divide
+						vec3 pointToSample = sls.point - inter.point;
+						pointToSample = normalize(pointToSample);
+
+						float bsdf = BSDF(inter.material, cartesianToSpherical(-inter.ray.direction), cartesianToSpherical(pointToSample));
+						float cosi = dot(inter.normal, pointToSample);
+						float prod = bsdf * cosi; // bounce toward light prod, called f in pbrt
+
+						if(prod > 0.0) {
+							Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample); // Better correlates with naive
+							// Ray ray_light = Ray(inter.point + inter.normal * epsilon, pointToSample); // Ray origin is shifted along normal instead of pointToSample
+
+							if(false) {
+								float dist = length(pointToSample);
+								float cosl = dot(sls.normal, -pointToSample);
+								float SA_to_area = cosl/(dist*dist);
+								pdf_light /= SA_to_area;
+							}
+
+							float V = float(visibility(ray_light, scene, sls.point));
+							vec3 Li = V * inter.material.albedo * scene.spheres[l].material.emissive;
+
+							vec3 color_current_light =  Li * prod / pdf_light;
+							// color_current_light /= float(scene.nbLightSpheres); // Should I divide ?
+							Li_all += color_current_light;
+						}
+					}
+			}
+		return Li_all;
+	}
+
 	vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 		vec3 res = vec3(0);
 		vec3 color_total;
@@ -587,7 +734,7 @@
 			inter = inter_dummy(ray);
 			if(raySceneIntersection(ray, scene, inter)) {
 				if(inter.material.emissive != vec3(0)) {
-					res += inter.material.emissive;
+					color_total += inter.material.emissive;
 				}
 
 				// Shadowed ?
@@ -596,28 +743,27 @@
 				} 
 				else 
 				{
-				for (int k = 0; k < MAXSPHERES; ++k)
-					if(k <= scene.nbLightSpheres)
-					{
-						for (int l = 0; l < MAXSPHERES; ++l)
-							if(l == scene.light_spheres[k])
-							{
-								SurfaceLightSample sls;
-								sampleSphereSA(inter.point, scene.spheres[l], sls);
+					color_total += sampleAllLights(scene, inter);
 
-								vec3 pointToSample = sls.point - inter.point;
-								pointToSample = normalize(pointToSample);
+					// for (int k = 0; k < MAXSPHERES; ++k)
+					// 	if(k <= scene.nbLightSpheres) {
+					// 		for (int l = 0; l < MAXSPHERES; ++l)
+					// 			if(l == scene.light_spheres[k]) {
+					// 				SurfaceLightSample sls;
+					// 				sampleSphereSA(inter.point, scene.spheres[l], sls);
 
-								Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample);
+					// 				vec3 pointToSample = sls.point - inter.point;
+					// 				pointToSample = normalize(pointToSample);
 
-								float V = float(visibility(ray_light, scene, sls.point));
+					// 				Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample);
 
+					// 				float V = float(visibility(ray_light, scene, sls.point));
 
-								vec3 color_current = V * abs(dot(ray.direction, inter.normal)) * inter.material.albedo * scene.spheres[l].material.emissive;
-								
-								color_total += color_current;
-							}
-					}
+					// 				vec3 color_current = V * abs(dot(ray.direction, inter.normal)) * inter.material.albedo * scene.spheres[l].material.emissive; // WARN: not sure if i should use cosine of light or old_ray
+									
+					// 				color_total += color_current;
+					// 			}
+					// 	}
 				}
 				vec3 color_tex;
 				if(u_iterations > 0.0)
@@ -630,6 +776,66 @@
 		return res;
 	}
 
+	vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool tmp) {
+		// res is pixel color
+		// color_total is computed color (needs to be scaled based on u_iterations)
+		// beta is propagating color
+		vec3 res, color_total, beta = vec3(1);
+
+		DirectionSample ds;
+		ds.pdf = 1.0;
+
+		if(u_iterations <= PATHS_NB) {
+			Intersection inter;
+			
+			for(int depth = 0; depth < MAX_DEPTH; ++depth) {
+				inter = inter_dummy(ray); // needed to init hit to false
+				if(raySceneIntersection(ray, scene, inter)) {
+					// float cost = abs(dot(-ray.direction, inter.normal)); // cosine according to triangle normal, arriving cosine
+
+					// Emissive material
+					if(isEmissive(inter.material)) {
+						if(depth == 0) {
+							color_total += inter.material.emissive;
+						} else if(naive) {
+							color_total += beta * inter.material.emissive; // lights do not have albedo // TODO: study different kind of lights
+						} else if(tmp && depth < MAX_DEPTH-1) {
+							color_total += beta * inter.material.emissive;
+						}
+					} else {
+						// Light sampling
+						if(!naive && !tmp) { // Iterative PT
+							color_total += beta * sampleAllLights(scene, inter);
+						} else if(tmp && depth == MAX_DEPTH-1) { // To sample light only at last vertex
+							color_total += beta * sampleAllLights(scene, inter);
+						}
+
+					}
+
+					// Surface sampling for next bounce
+					// sample_BSDF(inter, ds);
+					sample_BSDF_without_world_recalibration(inter, ds);
+					ray = Ray(inter.point + ds.direction*epsilon, ds.direction);
+
+					float cost = abs(dot(ds.direction, inter.normal));
+					beta *= cost * inter.material.albedo * ds.bsdf / ds.pdf; // this variable will propagate cosine, albedo and bsdf value through the path
+					if(ds.pdf <= 0.0 || beta == vec3(0)) break; // No prod (skymap or light touched) or no prob (opposite hemisphere sampling)
+				} 
+				else {
+					break; // No intersect
+				}
+			}
+			vec3 color_tex;
+			if(u_iterations > 0.0)
+				color_tex = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+			res = (color_tex * u_iterations + color_total) / (u_iterations + 1.0);
+		} else {
+			res = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // Static image
+		}
+		return res;
+	}
+
+
 	void main() {
 		vec3 delta_p = vec3(7,0,0);
 		vec2 delta_r = vec2(0);
@@ -641,7 +847,9 @@
 
 		Scene scene;
 
-		seed = time; // Add depth ? 
+		// seed = time;
+		seed = time * sin(time) + (gl_FragCoord.x+canvas.x*gl_FragCoord.y)/(canvas.y);
+
 
 		vec3 cam = cameraPos;
 		initCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
@@ -649,13 +857,22 @@
 		
 		vec3 color;
 
-		// for(int i = 1 ; i <= 1 ; ++i) // Make SPPPF samples per pixel per frame
-		Ray ray = makeRay(uv_swap, scene.camera);
-		if (u_render_mode == 0.0)
-			color = traceRay(ray, scene, false);
-		else if (u_render_mode == 1.0)
-			color = traceRay(ray, scene, true);
-
+		for(int i = 1 ; i <= SPPPF; ++i) // Make SPPPF samples per pixel per frame
+		{
+			Ray ray = makeRay(uv_swap, scene.camera);
+			if (u_render_mode == 0.0)
+				color += traceRay(ray, scene, false); // Raytracing
+			else if (u_render_mode == 1.0)
+				color += traceRay(ray, scene, true); // Raytracing shadowed
+			else if (u_render_mode == 2.0)
+				color += tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
+			else if (u_render_mode == 3.0)
+				color += tracePath(ray, scene, true, false); // Path tracing naive
+			else if (u_render_mode == 4.0)
+				color += tracePath(ray, scene, false, true); // Path tracing tmp (sample light on last vertex)
+		}
+		
+		color /= float(SPPPF);
 		gl_FragColor = vec4(color, 1.0);
 	}
 </script>
@@ -720,7 +937,8 @@
 	{
 		gl_FragColor = texture2D(texture, v_texCoord);
 		
-		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb,2.1, -0.8);
+		// gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
+		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -10.0);
 		gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
 	}
 

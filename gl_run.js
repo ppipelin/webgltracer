@@ -47,7 +47,7 @@ var u_textureLocationc;
 
 var time = 0;
 var iterations = 0;
-var render_mode = 1.0;
+var render_mode = 2.0;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -324,8 +324,15 @@ function handleKeyDown(event) {
 function change_render_mode(i) {
 	iterations = 0;
 	render_mode = i
-	if(i <= 1.0)
-		document.getElementById("raytracingshadow_dad").style.display = "block";
-	else if(i > 1.0)
-		document.getElementById("raytracingshadow_dad").style.display = "none";
+	console.log("Changed render_mode to: " + render_mode);
+	// if(i == 0.0 || i == 1.0) {
+	// 	document.getElementById("raytracing_shadow_dad").style.display = "block";
+	// 	document.getElementById("raytracing_shadow_dad").style.visibility = "visible";
+	// }
+	// else if(i == 2.0 || i == 3.0) {
+	// 	// document.getElementById("raytracing_shadow_dad").style.display = "none";
+	// 	document.getElementById("raytracing_shadow_dad").style.visibility = "hidden";
+	// }
+
+
 }
