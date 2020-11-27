@@ -66,6 +66,8 @@
 	<p>
 		/!\ WIP, see TODO below
 		<br>
+		Use mouse to move camera and keys to navigate through scene.
+		<br>
 		Not supported on phones.
 	</p>
 	<input type="button" class="finger bae-rock hella" value="Raytracing" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1.0:0.0)" />
@@ -86,11 +88,10 @@
 	<div id="message"></div>
 	<div id = "time"></div>
 	<br>
+
 	<ul>
 		<li>Path tracing -- Naive OK, Iterative WIP --> Light sampling method seems to introduce bias</li>
-		<li>Lambert with different samplers</li>
 		<li>Light tracing</li>
-		<li>Moving Cam</li>
 		<li>Import/export renders using 0-loss format</li>
 		<li>CT GGX</li>
 		<li>Moving objects</li>
@@ -111,21 +112,11 @@
 
 <script id="vs_pathTracer" type="x-shader/x-vertex">
 	attribute vec2 aVertex;
-	uniform vec3 vcameraPos;
-	uniform mat4 u_vInvMP;
 
-	varying vec3 InitRay;
 	varying vec2 v_uv;
 
 	void main() {
 		gl_Position = vec4(aVertex, 0.0, 1.0);
-		
-		vec2 percent = aVertex.xy * 0.5 + 0.5;
-		vec3 ray00 = ((u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
-		vec3 ray01 = ((u_vInvMP* vec4(-1.0, 1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
-		vec3 ray10 = ((u_vInvMP* vec4(1.0, -1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
-		vec3 ray11 = ((u_vInvMP* vec4(1.0, 1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
-		InitRay = mix(mix(ray00, ray01, percent.y), mix(ray10, ray11, percent.y), percent.x);
 		v_uv = aVertex * 0.5 + 0.5;
 	}
 </script>
@@ -134,15 +125,15 @@
 	precision mediump float;
 
 	uniform float time;
-	uniform int objnums;
-	uniform vec3 cameraPos;
 
 	uniform float u_iterations;
 	uniform sampler2D texture;
 
+	uniform vec2 mouse;
+	uniform vec3 keyboard;
+
 	uniform vec2 texsize;
 
-	varying vec3 InitRay; // To be used for antialiasing
 	varying vec2 v_uv;
 
 	uniform float u_render_mode; 
@@ -166,17 +157,14 @@
 	// Scene/inputs parameters
 	const float scene_scale = 1.0;
 	const float translation_speed = 10.0 * scene_scale;
-	const float rotation_speed = 1.0;
-	const vec3 BACKGROUND_COLOR = vec3(0.0);
+	const float rotation_speed = 0.1;
 	const vec3 canvas = vec3(512,512,0);
 	const vec4 INITIAL_POS_SPP = scene_scale * vec4(-40.0,0.0,-10.0,1.0);
 	const vec4 INITIAL_ROT_TECH = vec4(HALF_PI + 0.1,0,0,0);
 
 	// Rendering parameters
 	#define MAX_DEPTH 5
-	#define SPPPF 2
-	#define RUSSIAN_ROULETTE
-	#define WEIGHTS_VISUALIZATION 3
+	#define SPPPF 1
 	// const float epsilon = scene_scale * 0.005; // OLD
 	const float epsilon = scene_scale * 0.0001;
 
@@ -245,7 +233,6 @@
 		
 	struct SurfaceLightSample{
 		float pdf;
-		Sphere sphere;
 		vec3 point;
 		vec3 normal;
 	};
@@ -276,6 +263,7 @@
 	bool samePoint(vec3 a, vec3 b){
 		return length(a - b) <= epsilon;
 	}
+
 	vec4 quat(vec3 axis, float angle){
 		vec3 u = axis * sin(angle * 0.5);
 		return vec4(u, cos(angle * 0.5));
@@ -449,6 +437,8 @@
 				if(k == scene.nbLightTriangles+1)
 				scene.light_triangles[k] = scene.nbTriangles-1; // k is a constant
 			}
+			scene.nbLightTriangles += 2;
+			scene.nbLights +=2;
 		}
 	}
 	
@@ -464,6 +454,7 @@
 				if(k == scene.nbLightSpheres)
 				scene.light_spheres[k] = scene.nbSpheres-1;
 			scene.nbLightSpheres++;
+			scene.nbLights++;
 		}
 	}
 
@@ -503,13 +494,14 @@
 		float factor = 0.3;
 		
 		// Lights
-		Material mlight1 = Material(vec3(0), vec3(0,0.25,1), 0.0, 0);
+		Material mlight1 = Material(vec3(0), vec3(0,0.25,1) / factor, 0.0, 0);
+		// addQuad(center + scene_scale * vec3(0,0,2), scene_scale * factor * vec2(1.0) * 10.0, vec3(0,1,0), 0.0, mlight1, scene); // BLUE
 		addSphere(center + scene_scale * vec3(0,0,2), scene_scale * factor, mlight1, scene); // BLUE
 		
-		Material mlight2 = Material(vec3(0), vec3(1,1,0), 0.0, 0);
+		Material mlight2 = Material(vec3(0), vec3(1,1,0) / factor, 0.0, 0);
 		addSphere(center + scene_scale * vec3(-1,-1.5 ,-1.75), scene_scale * 2.0 * factor, mlight2, scene); // YELLOW
 
-		Material mlight3 = Material(vec3(0), vec3(1,0,0.25), 0.0, 0);
+		Material mlight3 = Material(vec3(0), vec3(1,0,0.25) / factor, 0.0, 0);
 		addSphere(center + scene_scale * vec3(0, 0, 0), scene_scale * 2.0 * factor, mlight3, scene); // PINK
 		
 		// Spheres
@@ -533,7 +525,7 @@
 	}
 
 	// FUNCTIONS RENDERING
-	float rand1() {
+	highp float rand1() {
 		return fract(sin(seed += 0.1)*43758.5453123);
 	}
 
@@ -545,16 +537,6 @@
 		return fract(sin(vec3(seed+=0.1,seed+=0.1,seed+=0.1))*vec3(43758.5453123,22578.1459123,19642.3490423));
 	}
 
-	highp float rand(vec2 co)
-	{
-		highp float a = 12.9898,b = 78.233,c = 43758.5453,dt= dot(co.xy ,vec2(a,b)),sn= mod(dt,3.14);
-		return fract(sin(sn) * c);
-	}
-
-	float getrandom(vec3 point) {
-		vec3 noise = vec3(rand(point.xy),rand(point.xz),rand(point.yz));
-		return fract(sin(dot(InitRay + seed, noise)) * 43758.5453 + seed);
-	}
 
 	vec3 sample_cosine(in vec3 normal, inout float pdf) {
 		float phi = rand1() * 2.0 * PI;
@@ -605,7 +587,7 @@
 			// new_dir_world = new_dir_local;
 
 			ds.direction = new_dir_world;
-			ds.bsdf = BSDF_lambert(old_dir_local_spherical, cartesianToSpherical(new_dir_local));
+			ds.bsdf = BSDF(inter.material, old_dir_local_spherical, cartesianToSpherical(new_dir_local));
 		}
 	}
 
@@ -838,7 +820,12 @@
 
 	void main() {
 		vec3 delta_p = vec3(7,0,0);
+			delta_p.x += keyboard.x;
+			delta_p.y += keyboard.y;
+			delta_p.z += keyboard.z;
 		vec2 delta_r = vec2(0);
+			delta_r.x += mouse.x * rotation_speed;
+			delta_r.y += mouse.y * rotation_speed;
 		vec4 pos_spp = INITIAL_POS_SPP; //(memorized location)
 		vec4 rot_tech = INITIAL_ROT_TECH;
 		vec2 rot_tech_xy = rot_tech.xy;
@@ -851,7 +838,6 @@
 		seed = time * sin(time) + (gl_FragCoord.x+canvas.x*gl_FragCoord.y)/(canvas.y);
 
 
-		vec3 cam = cameraPos;
 		initCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 
 		
@@ -860,18 +846,21 @@
 		for(int i = 1 ; i <= SPPPF; ++i) // Make SPPPF samples per pixel per frame
 		{
 			Ray ray = makeRay(uv_swap, scene.camera);
+			vec3 tmp;
 			if (u_render_mode == 0.0)
-				color += traceRay(ray, scene, false); // Raytracing
+				tmp = traceRay(ray, scene, false); // Raytracing
 			else if (u_render_mode == 1.0)
-				color += traceRay(ray, scene, true); // Raytracing shadowed
+				tmp = traceRay(ray, scene, true); // Raytracing shadowed
 			else if (u_render_mode == 2.0)
-				color += tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
+				tmp = tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
 			else if (u_render_mode == 3.0)
-				color += tracePath(ray, scene, true, false); // Path tracing naive
+				tmp = tracePath(ray, scene, true, false); // Path tracing naive
 			else if (u_render_mode == 4.0)
-				color += tracePath(ray, scene, false, true); // Path tracing tmp (sample light on last vertex)
+				tmp = tracePath(ray, scene, false, true); // Path tracing tmp (sample light on last vertex)
+			if(isColor(tmp))
+				color += tmp;
 		}
-		
+
 		color /= float(SPPPF);
 		gl_FragColor = vec4(color, 1.0);
 	}
@@ -937,8 +926,8 @@
 	{
 		gl_FragColor = texture2D(texture, v_texCoord);
 		
-		// gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
-		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -10.0);
+		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
+		// gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -10.0);
 		gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
 	}
 
