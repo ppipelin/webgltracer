@@ -36,7 +36,7 @@ var u_textureLocationc;
 
 var time = 0;
 var iterations = 0;
-var render_mode = 2.0;
+var render_mode = 2;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -154,7 +154,7 @@ function animate() {
 	
 		gl.uniform1f(u_timeLocation, time);
 		gl.uniform1f(u_itrLocation, iterations);
-		gl.uniform1f(u_render_modeLocation, render_mode);
+		gl.uniform1i(u_render_modeLocation, render_mode);
 
 		//Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
@@ -312,16 +312,6 @@ function handleKeyDown(event) {
 
 function change_render_mode(i) {
 	iterations = 0;
-	render_mode = i
+	render_mode = i;
 	console.log("Changed render_mode to: " + render_mode);
-	// if(i == 0.0 || i == 1.0) {
-	// 	document.getElementById("raytracing_shadow_dad").style.display = "block";
-	// 	document.getElementById("raytracing_shadow_dad").style.visibility = "visible";
-	// }
-	// else if(i == 2.0 || i == 3.0) {
-	// 	// document.getElementById("raytracing_shadow_dad").style.display = "none";
-	// 	document.getElementById("raytracing_shadow_dad").style.visibility = "hidden";
-	// }
-
-
 }
