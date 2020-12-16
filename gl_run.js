@@ -33,6 +33,7 @@ var u_numsLocation;
 var u_eyeLocation;
 var u_timeLocation;
 var u_itrLocation;
+var u_render_modeLocation;
 var u_textureLocation;
 var u_texsizeLocation;
 var u_texLocations = [];
@@ -46,6 +47,7 @@ var u_textureLocationc;
 
 var time = 0;
 var iterations = 0;
+var render_mode = 1.0;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -142,6 +144,7 @@ function initializeShader() {
 	//Fragment Shader        
 	u_timeLocation = gl.getUniformLocation(shaderProgram, "time");
 	u_itrLocation = gl.getUniformLocation(shaderProgram, "u_iterations");
+	u_render_modeLocation = gl.getUniformLocation(shaderProgram, "u_render_mode");
 	//Don't k why this line doesn't work
 	u_numsLocation = gl.getUniformLocation(shaderProgram, "objnums");
 	u_eyeLocation = gl.getUniformLocation(shaderProgram, "cameraPos");
@@ -178,6 +181,7 @@ function animate() {
 		gl.uniform3f(u_eyeLocation, eye.x, eye.y, eye.z);
 		gl.uniform1f(u_timeLocation, time);
 		gl.uniform1f(u_itrLocation, iterations);
+		gl.uniform1f(u_render_modeLocation, render_mode);
 
 		//Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
@@ -312,7 +316,16 @@ function handleMouseMove(event) {
 	iterations = 0;
 }
 
-function handleKeyDown(event){
+function handleKeyDown(event) {
 	if (event.keyCode == 32)
 		pause = !pause;
+}
+
+function change_render_mode(i) {
+	iterations = 0;
+	render_mode = i
+	if(i <= 1.0)
+		document.getElementById("raytracingshadow_dad").style.display = "block";
+	else if(i > 1.0)
+		document.getElementById("raytracingshadow_dad").style.display = "none";
 }
