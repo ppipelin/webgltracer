@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en"  style="background: #fafdfe">
+
+<script src="experiments/webgltracer/lib/gl-matrix.js" type="text/javascript"></script>
+<script src="experiments/webgltracer/gl_utils.js" type="text/javascript"></script>
+<script src="experiments/webgltracer/gl_run.js" type="text/javascript"></script>
+
+<head>
+	<!-- Global site tag (gtag.js) - Google Analytics -->
+	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-91929483-3"></script>
+	<script>
+		window.dataLayer = window.dataLayer || [];
+		function gtag(){dataLayer.push(arguments);}
+		gtag('js', new Date());
+
+		gtag('config', 'UA-91929483-3');
+	</script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+	<script> 
+		$(function(){
+			$("#header").load("header.html"); 
+			$("#footer").load("footer.html"); 
+		});
+	</script>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<meta name="author" content="Paul-Elie Pipelin">
+	<meta name="description" content="Webgl tracer. Personal site of Paul-Elie Pipelin, engineer in digital imaging.">
+	<meta name="keywords" content="WEBGL, Tracer, Raytracing, Pathtracing, Rendering, Engineer, Paul-Elie, Pipelin, Digital, Imaging, Computer, Graphics">
+	<meta name="theme-color" content="#36a1b0">
+
+	<title>Paul-Élie Pipelin - Webgl tracer</title>
+	<base href="/">
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat|Playfair+Display:200,300|Quicksand:300,400|Roboto">
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
+	<link rel="stylesheet" href="styles.css">
+	<!-- <link rel="stylesheet" href="experiments/styles.css"> -->
+	<link rel="icon" type="image/x-icon" href="../assets/Torch.png">
+</head>
+
+<body>
+	<a class="finger hella bae-rock +" href="experiments/rvb">
+		english
+	</a>
+	<a class="finger hella bae-rock +" href="experiments/rvb">
+		français
+	</a>
+
+	<div id="header">
+		<h1 class="forehead undertow charming hella ++++">
+			Paul-Élie Pipelin
+		</h1>
+	</div>
+
+	<!------------------------------------------------>
+
+	<nav class="tight stormsurge +++" aria-label="plunge" id="plunge">
+		<a class="finger bae-rock hella" href="">home</a>
+		<a class="finger bae-rock hella" href="experiments"><code>experiments</code></a>
+	</nav>
+
+	<!------------------------------------------------>
+	<p>
+		/!\ WIP, see TODO below
+		<br>
+		Not supported on phones.
+	</p>
+	<canvas id='canvas' width='512' height='512'></canvas>
+	<div id="message"></div>
+	<div id = "time"></div>
+	<br>
+	<ul>
+		<li>Path tracing</li>
+		<li>Lambert with different samplers</li>
+		<li>Light tracing</li>
+		<li>Moving Cam</li>
+		<li>Import/export renders using 0-loss format</li>
+		<li>CT GGX</li>
+		<li>Moving objects</li>
+		<li>Texturing</li>
+		<li></li>
+		<li>Anisotropy</li>
+		<li>Wavelength</li>
+		<li>Iridescent material</li>
+		<li></li>
+		<li>Import blender scene</li>
+	</ul>
+	Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well which is pretty good. <br>
+	Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc" target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
+
+	<div id="footer" class="forehead +++"></div>
+</body>
+</html>
+
+<script id="vs_pathTracer" type="x-shader/x-vertex">
+	attribute vec2 aVertex;
+	uniform vec3 vcameraPos;
+	uniform mat4 u_vInvMP;
+
+	varying vec3 InitRay;
+	varying vec2 v_uv;
+
+	void main() {
+		gl_Position = vec4(aVertex, 0.0, 1.0);
+		
+		vec2 percent = aVertex.xy * 0.5 + 0.5;
+		vec3 ray00 = ((u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
+		vec3 ray01 = ((u_vInvMP* vec4(-1.0, 1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
+		vec3 ray10 = ((u_vInvMP* vec4(1.0, -1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
+		vec3 ray11 = ((u_vInvMP* vec4(1.0, 1.0, 0.0, 1.0))/(u_vInvMP* vec4(-1.0, -1.0, 0.0, 1.0)).w).xyz - vcameraPos;
+		InitRay = mix(mix(ray00, ray01, percent.y), mix(ray10, ray11, percent.y), percent.x);
+		v_uv = aVertex * 0.5 + 0.5;
+	}
+</script>
+
+<script id="fs_pathTracer" type="x-shader/x-fragment">
+	precision mediump float;
+
+	uniform float time;
+	uniform int objnums;
+	uniform vec3 cameraPos;
+
+	uniform float u_iterations;
+	uniform sampler2D texture;
+	uniform sampler2D attrtexture;
+
+	uniform vec2 texsize;
+	uniform vec2 attrtexsize;
+
+	varying vec3 InitRay; // To be used for antialiasing
+	varying vec2 v_uv;
+
+	// VARIABLES
+
+	#define UP vec3(0,0,1)
+	#define MAXLIGHTS 5
+	#define MAXSPHERES 15
+	#define MAXTRIANGLES 15
+	#define PI 3.1415926536
+	#define HALF_PI 1.5707963268
+	#define TWO_PI 6.28318530718
+	#define FOUR_PI 12.56637061436
+	#define PATHS_NB 500.0
+	
+	// Benchmark options
+	//#define STOP_TIME 10.0
+	//#define STOP_SAMPLES 64u
+	float seed;
+
+	// Scene/inputs parameters
+	const float scene_scale = 1.0;
+	const float translation_speed = 10.0 * scene_scale;
+	const float rotation_speed = 1.0;
+	const vec3 BACKGROUND_COLOR = vec3(0.0);
+	const vec3 canvas = vec3(512,512,0);
+	const vec4 INITIAL_POS_SPP = scene_scale * vec4(-40.0,0.0,-10.0,1.0);
+	const vec4 INITIAL_ROT_TECH = vec4(HALF_PI + 0.1,0,0,0);
+
+	// Rendering parameters
+	#define MAX_DEPTH 5
+	#define SPPPF 1
+	#define RUSSIAN_ROULETTE
+	#define WEIGHTS_VISUALIZATION 3
+	const float epsilon = scene_scale * 0.005;
+
+	// END_VARIABLES
+
+	// STRUCTURES
+	struct Camera{
+		vec3 position;
+		vec3 front;
+		vec3 right;
+		vec3 down;
+		vec2 plane;
+	};
+
+	Camera makeCameraFromFrontRight(vec3 position, vec3 front, vec3 right, vec2 plane){
+		vec3 down= cross(front, right);
+		down = down/length(down);
+		return Camera(position, front, right, down, plane);
+	}
+
+	struct PointLight{
+		vec3 position;
+		vec3 color;
+	};
+
+	struct Material{
+		vec3 albedo; // Loss of energy or not
+		vec3 emissive;
+		float shininess;
+		// int bsdf_number; // 0 is lambert
+		// int sampler_number;
+	};
+		
+	struct Sphere{
+		vec3 position;
+		float radius;
+		float radius2;
+		Material material;
+	};
+		
+	struct Triangle{
+		vec3 v0;
+		vec3 v1;
+		vec3 v2;
+		Material material;
+	};
+
+	struct Scene{
+		Camera camera;
+		PointLight[MAXLIGHTS] lights;
+		Sphere[MAXSPHERES] spheres;
+		Triangle[MAXTRIANGLES] triangles;
+		int[MAXSPHERES] light_spheres;
+		int[MAXTRIANGLES] light_triangles;
+		int nbLights;
+		int nbLightSpheres;
+		int nbLightTriangles;
+		int nbSpheres;
+		int nbTriangles;
+	};
+
+	struct Ray{
+		vec3 origin;
+		vec3 direction;
+	};
+		
+	struct SurfaceLightSample{
+		float pdf;
+		Sphere sphere;
+		vec3 point;
+		vec3 normal;
+	};
+		
+	struct DirectionSample{
+		float pdf;
+		vec3 bsdf;
+		vec3 direction;
+	};
+		
+	struct Intersection{
+		bool hit;
+		vec3 point;
+		float t;
+		vec3 normal;
+		Ray ray;
+		Material material;
+		int tptr;
+		int sptr;
+	};
+	// END_STRUCTURES
+
+	// FUNCTIONS GEOMETRY
+	bool samePoint(vec3 a, vec3 b){
+		return length(a - b) <= epsilon;
+	}
+	vec4 quat(vec3 axis, float angle){
+		vec3 u = axis * sin(angle * 0.5);
+		return vec4(u, cos(angle * 0.5));
+	}
+
+	vec3 rotate(vec4 q, vec3 v){
+		vec3 u = q.xyz;
+		float s = q.w;
+		return 2.0 * dot(u, v) * u
+			  + (s*s - dot(u, u)) * v
+			  + 2.0 * s * cross(u, v);
+	}
+
+	vec3 rotate(vec3 axis, float angle, vec3 v){
+		float s = sin(angle * 0.5);
+		vec3 u = axis * s;
+		float w = cos(angle * 0.5);
+		
+		return 2.0 * dot(v, u) * u +
+			   (w*w  - dot(u,u)) * v +
+			   2.0 * w * cross(u, v);
+
+	}
+	vec3 polarToCartesian(vec2 polar){
+		return vec3(sin(polar.x) * cos(polar.y), sin(polar.x) * sin(polar.y), cos(polar.x));
+	}
+	mat3 rotationMatrix(vec3 axis, float angle)
+	{
+		axis = normalize(axis);
+		float s = sin(angle);
+		float c = cos(angle);
+		float oc = 1.0 - c;
+		return mat3(oc * axis.x * axis.x + c         ,  oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,
+					oc * axis.x * axis.y + axis.z * s, 	oc * axis.y * axis.y + c		 ,  oc * axis.y * axis.z - axis.x * s,
+					oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s, 	oc * axis.z * axis.z + c		 );
+	}
+
+	Ray makeRay(vec2 uv, in Camera camera){
+		vec3 direction = camera.front - 
+			camera.right * (0.5 - uv.x) * camera.plane.x - 
+			camera.down * (0.5 - uv.y) * camera.plane.y;
+		
+		return Ray(camera.position, normalize(direction));
+	}
+
+	Intersection inter_dummy(in Ray ray){
+		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0);
+		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
+	}
+
+	Intersection inter_succeeded(vec3 point, float t, vec3 normal, in Ray ray, in Material material, int tptr, int sptr){
+		bool ok = dot(ray.direction, normal) <= 0.0;
+		normal *= (1.0 * float(ok) -1.0 * float(!ok));
+		return Intersection(true, point,t, normal, ray, material, tptr, sptr);
+	}
+
+	bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection currentInter, int sptr){
+		vec3 oc = ray.origin - sphere.position;
+		float b = dot( oc, ray.direction );
+		float c = dot( oc, oc ) - sphere.radius2;
+		float h = b*b - c;
+		if(h < 0.0) return false;
+		h = sqrt( h );
+		float t1 = -b-h;
+		float t2 = -b+h;
+		float t = 0.0;
+		if(t1 < 0.0 && t2 < 0.0) return false;
+		else if(t1 > 0.0) {
+			if(t2 > 0.0) t = min(t1,t2);
+			else t = t1;
+		} else t = t2;
+		if(t > currentInter.t && currentInter.hit) return true;
+		vec3 point = ray.origin + t *  ray.direction;
+		vec3 normal = (point - sphere.position) / sphere.radius;   
+		currentInter = inter_succeeded(point, t, normal, ray, sphere.material,  -1, sptr);
+		return true;
+	}
+
+	// triangle degined by vertices v0, v1 and v2
+	bool rayTriangleIntersection(in Ray ray,  in Triangle tri, inout Intersection currentInter, int tptr)
+	{
+		vec3 v1v0 = tri.v1 - tri.v0;
+		vec3 v2v0 = tri.v2 - tri.v0;
+		vec3 rov0 = ray.origin - tri.v0;
+		vec3  n = cross( v1v0, v2v0 );
+		vec3  q = cross( rov0, ray.direction );
+		float d = 1.0/dot( ray.direction, n );
+		float u = d*dot( -q, v2v0 );
+		float v = d*dot(  q, v1v0 );
+		float t = d*dot( -n, rov0 );
+		if(u<0.0 || u>1.0 || v<0.0 || (u+v)>1.0 || t <= 0.0) return false;
+		if(t > currentInter.t && currentInter.hit) return true;
+		vec3 point = ray.origin + ray.direction * t;
+		currentInter = inter_succeeded(point, t, normalize(n), ray, tri.material, tptr, -1);
+		return true;
+	}
+
+	bool raySceneIntersection(in Ray ray, in Scene scene, inout Intersection inter){
+		for(int i = 0 ; i < MAXSPHERES ; ++i){
+			raySphereIntersection(ray, scene.spheres[i], inter, int(i));
+		}
+		for(int i = 0 ; i < MAXTRIANGLES ; ++i){
+			if(i < scene.nbTriangles)
+			rayTriangleIntersection(ray, scene.triangles[i], inter, int(i));
+		}
+		return inter.hit;
+	}
+	bool visibility(in Ray ray, in Scene scene, vec3 point){
+		Intersection inter = inter_dummy(ray);
+		raySceneIntersection(ray, scene, inter);
+		return !inter.hit || samePoint(inter.point, point);
+	}
+
+	// FUNCTIONS MATERIALS
+	bool isEmissive(in Material mat){
+		return mat.emissive.r > 0.0 || mat.emissive.g > 0.0 || mat.emissive.b > 0.0;
+	}
+
+	// FUNCTIONS SCENE
+	void addQuad(vec3 position, vec2 scale, vec3 axis, float angle, in Material material, inout Scene scene){
+		mat3 R = rotationMatrix(axis, angle);
+		vec3 fl = R * vec3(-0.5*scale.x, -0.5*scale.y, 0) + position;
+		vec3 fr = R * vec3(-0.5*scale.x, 0.5*scale.y, 0) + position;
+		vec3 bl = R * vec3(0.5*scale.x, -0.5*scale.y, 0) + position;
+		vec3 br = R * vec3(0.5*scale.x, 0.5*scale.y, 0) + position;
+
+		// for (int k = scene.nbTriangles; k < scene.nbTriangles + 2; ++k) // Does not work cause bounds are not const
+		// 	scene.triangles[k] = Triangle(fl, fr, br, material); // k is a constant
+		for (int k = 0; k < MAXTRIANGLES; ++k)
+			if(k == scene.nbTriangles)
+			scene.triangles[k] = Triangle(fl, fr, br, material); // k is a constant
+			else if(k == scene.nbTriangles+1)
+		    scene.triangles[k] = Triangle(br, bl, fl, material);
+
+		scene.nbTriangles += 2;
+
+		if(isEmissive(material)){
+			for (int k = 0; k < MAXLIGHTS; ++k){
+				if(k == scene.nbLightTriangles)
+				scene.light_triangles[k] = scene.nbTriangles-2; // k is a constant
+				if(k == scene.nbLightTriangles+1)
+				scene.light_triangles[k] = scene.nbTriangles-1; // k is a constant
+			}
+		}
+	}
+	
+	void addSphere(vec3 position, float radius, Material material, inout Scene scene){
+		for (int k = 0; k < MAXSPHERES; ++k)
+			if(k == scene.nbSpheres)
+			scene.spheres[k] = Sphere(position, radius, radius*radius, material); // k is a constant
+		
+		scene.nbSpheres++;
+
+		if(isEmissive(material)){
+			for (int k = 0; k < MAXLIGHTS; ++k)
+				if(k == scene.nbLightSpheres)
+				scene.light_spheres[k] = scene.nbSpheres-1;
+			scene.nbLightSpheres++;
+		}
+	}
+
+	void addCornell(vec3 position, float scale, in Material mground, in Material mfront, in Material mleft, in Material mright,in Material mup, inout Scene scene){
+		// ground
+		addQuad(position + scale *  vec3(0.0,0,-0.5), scale * vec2(1.0), vec3(0,1,0), 0.0, mground, scene);
+		// front
+		addQuad(position + scale * vec3(0.5,0,0), scale * vec2(1.0), vec3(0,1,0), HALF_PI, mfront, scene);
+		// left
+		addQuad(position + scale *  vec3(0,0.5,0), scale * vec2(1.0), vec3(1,0,0), HALF_PI, mleft, scene);
+		// right
+		addQuad(position + scale *  vec3(0,-0.5,0), scale * vec2(1.0), vec3(1,0,0), -HALF_PI, mright, scene);
+		// up
+		addQuad(position + scale * vec3(0,0,0.5), scale *  vec2(1.0), vec3(0,1,0), 0.0, mup, scene);
+	}
+
+	void initCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r){
+		// Camera
+		rotation += delta_r;
+		vec3 front = polarToCartesian(rotation);
+		vec3 right = normalize(cross(UP, front));
+		
+		position += front * delta_p.x;
+		position += right * delta_p.y;
+		position.z += delta_p.z;
+		
+		vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
+		scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
+		
+		Material diffuse_white = Material(vec3(1), vec3(0), 0.0);
+		Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0);
+		Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0);
+		
+		// Cornell
+		vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
+		addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
+		float factor = 0.3;
+		
+		// Lights
+		Material mlight1 = Material(vec3(0), vec3(0,0.25,1), 0.0);
+		addSphere(center + scene_scale * vec3(0,0,2), scene_scale * factor, mlight1, scene);
+		
+		Material mlight2 = Material(vec3(0), vec3(1,1,0), 0.0);
+		addSphere(center + scene_scale * vec3(-1,-1.5 ,-1.75), scene_scale * 2.0 * factor, mlight2, scene);
+
+		Material mlight3 = Material(vec3(0), vec3(1,0,0.25), 0.0);
+		addSphere(center + scene_scale * vec3(0, 0, 0), scene_scale * 2.0 * factor, mlight3, scene);
+		
+		// Spheres
+		Material msdiffp = Material(vec3(0.8,0.2,0.7), vec3(0), 0.0);
+		addSphere(center + scene_scale * vec3(1,-1,-1), scene_scale * factor * 3.0, msdiffp, scene);
+		
+		Material msdiffy = Material(vec3(1,1,0), vec3(0), 0.0);
+		addSphere(center + scene_scale * vec3(1,-3,2), scene_scale * factor * 7.0, msdiffy, scene);
+		
+		Material msgloss1 = Material(vec3(0.3,0.9,0.9), vec3(0), 10.0);
+		addSphere(center + scene_scale * vec3(1,2,-1), scene_scale * factor * 5.0, msgloss1, scene);
+		
+		Material msspec1 = Material(vec3(1.0,0.5,0.3), vec3(0), 1000.0);
+		addSphere(center + scene_scale * vec3(0,0,-8), scene_scale * factor * 20.0, msspec1, scene);
+		
+		Material msspec2 = Material(vec3(1.0,1.0,1.0), vec3(0), 50000.0);
+		addSphere(center + scene_scale * vec3(5,5,5), scene_scale * factor * 20.0, msspec2, scene);
+		
+		Material msgloss2 = Material(vec3(1.0,0.0,0.7), vec3(0), 1.0);
+		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 3.0, msgloss2, scene);
+	}
+
+	// FUNCTIONS RENDERING
+	float rand1() {
+		return fract(sin(seed += 0.1)*43758.5453123);
+	}
+
+	vec2 rand2() {
+		return fract(sin(vec2(seed+=0.1,seed+=0.1))*vec2(43758.5453123,22578.1459123));
+	}
+
+	vec3 rand3() {
+		return fract(sin(vec3(seed+=0.1,seed+=0.1,seed+=0.1))*vec3(43758.5453123,22578.1459123,19642.3490423));
+	}
+
+	highp float rand(vec2 co)
+	{
+		highp float a = 12.9898,b = 78.233,c = 43758.5453,dt= dot(co.xy ,vec2(a,b)),sn= mod(dt,3.14);
+		return fract(sin(sn) * c);
+	}
+
+	float getrandom(vec3 point) {
+		vec3 noise = vec3(rand(point.xy),rand(point.xz),rand(point.yz));
+		return fract(sin(dot(InitRay + seed, noise)) * 43758.5453 + seed);
+	}
+
+	//https://www.akalin.com/sampling-visible-sphere
+	void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls){
+		// get costheta and phi
+		vec3 main_direction = (viewer - sphere.position);
+		float d = length(main_direction);
+		main_direction /= d;
+		float d2 = d*d;
+		float sinthetamax = sphere.radius /d;
+		
+		//float thetamax = asin(sinthetamax);
+		float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax);//cos(thetamax);
+		
+		float costheta = 1.0 - rand1()  * (1.0 - costhetamax);
+		
+		float sintheta = sqrt(1.0 - costheta * costheta);//sin(acos(costheta))
+		float phi = rand1() * TWO_PI;
+		
+		// D = 1 - d² sin² θ / r²
+		float sintheta2 =  sintheta * sintheta;
+		float D = 1.0 - d2 * sintheta2 / sphere.radius2;
+		bool D_positive = D > 0.0;
+		
+		float cosalpha = float(D_positive) * (sintheta2 / sinthetamax +  costheta * sqrt(abs(D)))
+						+float(!D_positive) * sinthetamax;
+		
+		float sinalpha = sin(acos(cosalpha));//sqrt(1.0 - cosalpha * cosalpha);
+
+		vec3 direction = vec3(sinalpha * cos(phi), sinalpha * sin(phi), cosalpha);
+		if(abs(main_direction.z) > 0.99999){
+			sls.normal = direction * sign(main_direction.z);
+		}
+		else{
+			vec3 axis = normalize(cross(UP, main_direction));
+			float angle = acos(main_direction.z);
+
+			sls.normal = rotate(axis, angle, direction);
+		}
+		sls.point = sphere.position + sphere.radius * sls.normal;
+		float solid_angle = TWO_PI * (1.0 - costhetamax);
+		sls.pdf = 1.0 / solid_angle;
+	}
+
+	vec3 calculateRandomDirectionInHemisphere(float seed, vec3 normal) {
+		float u = getrandom(vec3(12.9898, 78.233, 151.7182));
+		float v = getrandom(vec3(63.7264, 10.873, 623.6736));
+				
+		float up = sqrt(u); 
+		float over = sqrt(1.0 - up * up); 
+		float around = v * 3.141592 * 2.0;
+			
+		vec3 directionNotNormal;
+		if (abs(normal.x) < 0.577350269189) { 
+			directionNotNormal = vec3(1, 0, 0);
+		} else if (abs(normal.y) < 0.577350269189) { 
+			directionNotNormal = vec3(0, 1, 0);
+		} else {
+			directionNotNormal = vec3(0, 0, 1);
+		}
+					
+		vec3 perpendicularDirection1 = normalize(cross(normal, directionNotNormal));
+		vec3 perpendicularDirection2 = normalize(cross(normal, perpendicularDirection1)); 
+			
+		return ( up * normal ) + ( cos(around) * over * perpendicularDirection1 ) + ( sin(around) * over * perpendicularDirection2 );
+	}
+
+	vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
+		vec3 res = vec3(0);
+		vec3 color_total;
+		if(u_iterations <= PATHS_NB) {
+			Intersection inter;
+			inter = inter_dummy(ray);
+			if(raySceneIntersection(ray, scene, inter)) {
+				if(inter.material.emissive != vec3(0)) {
+					res += inter.material.emissive;
+				}
+
+				// Shadowed ?
+				if(!shadow){
+					color_total += abs(dot(ray.direction, inter.normal)) * inter.material.albedo;
+				} 
+				else 
+				{
+				for (int k = 0; k < MAXSPHERES; ++k)
+					if(k <= scene.nbLightSpheres)
+					{
+						for (int l = 0; l < MAXSPHERES; ++l)
+							if(l == scene.light_spheres[k])
+							{
+								SurfaceLightSample sls;
+								sampleSphereSA(inter.point, scene.spheres[l], sls);
+
+								vec3 pointToSample = sls.point - inter.point;
+								pointToSample = normalize(pointToSample);
+
+								Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample);
+
+								float V = float(visibility(ray_light, scene, sls.point));
+
+
+								vec3 color_current = V * abs(dot(ray.direction, inter.normal)) * inter.material.albedo * scene.spheres[l].material.emissive;
+								
+								color_total += color_current;
+							}
+					}
+				}
+				vec3 color_tex;
+				if(u_iterations > 0.0)
+					color_tex = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+				res += (color_tex * u_iterations + color_total) / (u_iterations + 1.0);
+			}
+		} else
+			res = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+
+		return res;
+	}
+
+	void main() {
+		vec3 delta_p = vec3(7,0,0);
+		vec2 delta_r = vec2(0);
+		vec4 pos_spp = INITIAL_POS_SPP; //(memorized location)
+		vec4 rot_tech = INITIAL_ROT_TECH;
+		vec2 rot_tech_xy = rot_tech.xy;
+		vec2 uv_swap = v_uv;
+		uv_swap.x = -v_uv.x + 1.0;
+
+		Scene scene;
+
+		seed = time; // Add depth ? 
+
+		vec3 cam = cameraPos;
+		initCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+
+		
+		vec3 color;
+
+		// for(int i = 1 ; i <= 1 ; ++i) // Make SPPPF samples per pixel per frame
+		Ray ray = makeRay(uv_swap, scene.camera);
+		color = traceRay(ray, scene, true);
+
+		gl_FragColor = vec4(color, 1.0);
+	}
+</script>
+<script id="vs_render" type="x-shader/x-vertex">
+
+	precision mediump float;
+
+	attribute vec3 aVertex;
+	varying vec2 v_texCoord;
+
+	void main(void)
+	{
+		v_texCoord = aVertex.xy * 0.5 + 0.5;
+		gl_Position = vec4(aVertex, 1.0);
+	}
+
+</script>
+<script id="fs_render" type="x-shader/x-fragment">
+	precision mediump float;
+
+	uniform sampler2D texture;
+	varying vec2 v_texCoord;
+
+	const float A = 0.15; // ShoulderStrength
+	const float B = 0.50; // LinearStrength
+	const float C = 0.10; // LinearAngle
+	const float D = 0.20; // ToeStrength
+	const float E = 0.02;
+	const float F = 0.30;
+	const float W = 10.2;
+
+	vec3 Uncharted2Tonemap(vec3 x){
+		return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;
+	}
+
+	vec3 ACESFilm(vec3 x ){
+		const float a = 2.51;
+		const float b = 0.03;
+		const float c = 2.43;
+		const float d = 0.59;
+		const float e = 0.14;
+		return clamp(vec3(0.),vec3(1.),(x*(a*x+b))/(x*(c*x+d)+e));
+	}
+
+	vec3 ExposureCorrect(vec3 col, float linfac, float logfac){
+		return linfac*(1.0 - exp(col*logfac));
+	}
+
+	vec3 LinearToGamma(vec3 linRGB){
+		linRGB = max(linRGB, vec3(0.));
+		return max(1.055 * pow(linRGB, vec3(0.416666667)) - 0.055, vec3(0.));
+	}
+
+	vec3 ACESFilmicToneMapping(vec3 col){
+		vec3 curr = Uncharted2Tonemap(col);
+		const float ExposureBias = 2.0;
+		curr *= ExposureBias;
+		curr /= Uncharted2Tonemap(vec3(W));
+		return LinearToGamma(curr);
+	}
+
+	void main(void)
+	{
+		gl_FragColor = texture2D(texture, v_texCoord);
+		
+		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb,2.1, -0.8);
+		gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+	}
+
+</script>
