@@ -50,8 +50,7 @@
 			message.innerText = "The browser does not support WebGL.  Visit http://get.webgl.org.";
 			return undefined;
 		}
-		var options = { alpha: false };        
-		var context = canvas.getContext("webgl") || canvas.getContext("experimental-webgl", options);
+		var context = canvas.getContext("webgl2") || canvas.getContext("webgl");
 	
 		if (!context && message) {
 			message.innerText = "The browser supports WebGL, but initialization failed.";

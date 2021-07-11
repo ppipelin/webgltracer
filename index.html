@@ -113,10 +113,10 @@
 </body>
 </html>
 
-<script id="vs_pathTracer" type="x-shader/x-vertex">
-	attribute vec2 aVertex;
+<script id="vs_pathTracer" type="x-shader/x-vertex">#version 300 es
+	in vec2 aVertex;
 
-	varying vec2 v_uv;
+	out vec2 v_uv;
 
 	void main() {
 		gl_Position = vec4(aVertex, 0.0, 1.0);
@@ -124,22 +124,23 @@
 	}
 </script>
 
-<script id="fs_pathTracer" type="x-shader/x-fragment">
+<script id="fs_pathTracer" type="x-shader/x-fragment">#version 300 es
 	precision mediump float;
 
 	uniform float time;
 
 	uniform float u_iterations;
-	uniform sampler2D texture;
+	uniform sampler2D u_texture;
 
 	uniform vec2 mouse;
 	uniform vec3 keyboard;
 
 	uniform vec2 texsize;
 
-	varying vec2 v_uv;
-
 	uniform int u_render_mode; 
+
+	in vec2 v_uv;
+	out vec4 fragColor;
 
 	// VARIABLES
 
@@ -978,11 +979,11 @@
 			}
 			vec3 color_tex;
 			if(u_iterations > 0.0)
-				color_tex = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+				color_tex = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
 			if(isColor(color_total))
 				res += (color_tex * u_iterations + color_total) / (u_iterations + 1.0);
 		} else
-			res = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+			res = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
 		return res;
 	}
 
@@ -1029,12 +1030,12 @@
 
 				vec3 color_tex;
 				if(u_iterations > 0.0)
-					color_tex = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+					color_tex = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
 				if(isColor(color_total))
 					res += (color_tex * u_iterations + color_total) / (u_iterations + 1.0);
 			}
 		} else
-			res = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+			res = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
 
 		return res;
 	}
@@ -1094,11 +1095,11 @@
 			}
 			vec3 color_tex;
 			if(u_iterations > 0.0)
-				color_tex = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
+				color_tex = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // previous frame
 			if(isColor(color_total))
 				res = (color_tex * u_iterations + color_total) / (u_iterations + 1.0);
 		} else {
-			res = texture2D(texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // Static image
+			res = texture(u_texture, vec2(gl_FragCoord.x / texsize.r, gl_FragCoord.y / texsize.g)).rgb; // Static image
 		}
 		return res;
 	}
@@ -1150,14 +1151,14 @@
 		}
 
 		color /= float(SPPPF);
-		gl_FragColor = vec4(color, 1.0);
+		fragColor = vec4(color, 1.0);
 	}
 </script>
-<script id="vs_render" type="x-shader/x-vertex">
+<script id="vs_render" type="x-shader/x-vertex">#version 300 es 
 	precision mediump float;
 
-	attribute vec3 aVertex;
-	varying vec2 v_texCoord;
+	in vec3 aVertex;
+	out vec2 v_texCoord;
 
 	void main(void)
 	{
@@ -1166,11 +1167,12 @@
 	}
 
 </script>
-<script id="fs_render" type="x-shader/x-fragment">
+<script id="fs_render" type="x-shader/x-fragment">#version 300 es
 	precision mediump float;
 
-	uniform sampler2D texture;
-	varying vec2 v_texCoord;
+	uniform sampler2D u_texture;
+	in vec2 v_texCoord;
+	out vec4 fragColor;
 
 	const float A = 0.15; // ShoulderStrength
 	const float B = 0.50; // LinearStrength
@@ -1212,11 +1214,11 @@
 
 	void main(void)
 	{
-		gl_FragColor = texture2D(texture, v_texCoord);
+		fragColor = texture(u_texture, v_texCoord);
 		
-		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
-		// gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -10.0);
-		gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
+		fragColor.rgb = ExposureCorrect(fragColor.rgb, 2.1, -0.8);
+		// fragColor.rgb = ExposureCorrect(fragColor.rgb, 2.1, -10.0);
+		fragColor.rgb = ACESFilmicToneMapping(fragColor.rgb);
 	}
 
 </script>
