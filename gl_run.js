@@ -21,6 +21,7 @@ var VertexLocation;
 var u_timeLocation;
 var u_itrLocation;
 var u_render_modeLocation;
+var u_random_modeLocation;
 var u_textureLocation;
 var u_texsizeLocation;
 var u_texLocations = [];
@@ -37,6 +38,7 @@ var u_textureLocationc;
 var u_time = 0;
 var u_iterations = 0;
 var u_render_mode = 2;
+var u_random_mode = 0;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -131,6 +133,7 @@ function initializeShader() {
 	u_timeLocation = gl.getUniformLocation(shaderProgram, "u_time");
 	u_itrLocation = gl.getUniformLocation(shaderProgram, "u_iterations");
 	u_render_modeLocation = gl.getUniformLocation(shaderProgram, "u_render_mode");
+	u_random_modeLocation = gl.getUniformLocation(shaderProgram, "u_random_mode");
 
 	u_textureLocation = gl.getUniformLocation(shaderProgram, "u_texture");
 	u_texsizeLocation = gl.getUniformLocation(shaderProgram, "u_texsize");
@@ -155,6 +158,7 @@ function animate() {
 		gl.uniform1f(u_timeLocation, u_time);
 		gl.uniform1i(u_itrLocation, u_iterations);
 		gl.uniform1i(u_render_modeLocation, u_render_mode);
+		gl.uniform1i(u_random_modeLocation, u_random_mode);
 
 		//Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
@@ -314,4 +318,10 @@ function change_render_mode(i) {
 	u_iterations = 0;
 	u_render_mode = i;
 	console.log("Changed render_mode to: " + u_render_mode);
+}
+
+function change_random_mode(i) {
+	u_iterations = 0;
+	u_random_mode = i;
+	console.log("Changed random_mode to: " + u_random_mode);
 }
