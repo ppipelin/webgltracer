@@ -148,6 +148,8 @@
 
 	uniform int u_random_mode;
 	
+	uniform int u_scene;
+
 	in vec2 v_uv;
 	out vec4 o_fragColor;
 
@@ -1057,6 +1059,7 @@
 		return res;
 	}
 
+	Scene scene;
 
 	void main() {
 		vec3 delta_p = vec3(11,0,0);
@@ -1072,7 +1075,6 @@
 		vec2 uv_swap = v_uv;
 		uv_swap.x = -v_uv.x + 1.0;
 
-		Scene scene;
 
 		if(u_random_mode == 0)
 			seed = u_time * sin(u_time) + (gl_FragCoord.x+canvas.x*gl_FragCoord.y)/(canvas.y);
@@ -1080,7 +1082,10 @@
 			seed = u_time;
 
 		initCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-		// initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+		//if(u_scene == 0)
+		//	initCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+		//else
+		//	initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 		
 		vec3 color;
 
