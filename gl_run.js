@@ -34,9 +34,9 @@ var vertexPositionBuffer;
 var frameBuffer;
 var u_textureLocationc;
 
-var time = 0;
-var iterations = 0;
-var render_mode = 2;
+var u_time = 0;
+var u_iterations = 0;
+var u_render_mode = 2;
 
 ///////////////////////////////////////////////////////////////////////////
 
@@ -112,10 +112,10 @@ function initializeShader() {
 	var renderFs = getShaderSource(document.getElementById("fs_render"));
 
 	renderProgram = createProgram(gl, renderVs, renderFs, message);
-	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'aVertex');
+	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'i_vertex');
 	gl.enableVertexAttribArray(renderVertexAttribute);
 
-	u_textureLocationc = gl.getUniformLocation(renderProgram, "texture");
+	u_textureLocationc = gl.getUniformLocation(renderProgram, "u_texture");
 
 	// Create path tracer shader
 	var vs = getShaderSource(document.getElementById("vs_pathTracer"));
@@ -124,16 +124,16 @@ function initializeShader() {
 	shaderProgram = createProgram(gl, vs, fs, message);
 
 	// Vertex Shader
-	VertexLocation = gl.getAttribLocation(shaderProgram, "aVertex");
+	VertexLocation = gl.getAttribLocation(shaderProgram, "i_vertex");
 	gl.enableVertexAttribArray(VertexLocation);
 
 	// Fragment Shader        
-	u_timeLocation = gl.getUniformLocation(shaderProgram, "time");
+	u_timeLocation = gl.getUniformLocation(shaderProgram, "u_time");
 	u_itrLocation = gl.getUniformLocation(shaderProgram, "u_iterations");
 	u_render_modeLocation = gl.getUniformLocation(shaderProgram, "u_render_mode");
 
-	u_textureLocation = gl.getUniformLocation(shaderProgram, "texture");
-	u_texsizeLocation = gl.getUniformLocation(shaderProgram, "texsize");
+	u_textureLocation = gl.getUniformLocation(shaderProgram, "u_texture");
+	u_texsizeLocation = gl.getUniformLocation(shaderProgram, "u_texsize");
 
 	// Move
 	u_mouseLocation = gl.getUniformLocation(shaderProgram, "mouse");
@@ -143,18 +143,18 @@ function initializeShader() {
 
 function animate() {
 	
-	message.innerHTML = "Iterations: " + (iterations).toString();
+	message.innerHTML = "Iterations: " + (u_iterations).toString();
 
-	if (!pause || iterations == 0) {
+	if (!pause || u_iterations == 0) {
 		///////////////////////////////////////////////////////////////////////////
 		// Render
 		gl.useProgram(shaderProgram);
 
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	
-		gl.uniform1f(u_timeLocation, time);
-		gl.uniform1f(u_itrLocation, iterations);
-		gl.uniform1i(u_render_modeLocation, render_mode);
+		gl.uniform1f(u_timeLocation, u_time);
+		gl.uniform1i(u_itrLocation, u_iterations);
+		gl.uniform1i(u_render_modeLocation, u_render_mode);
 
 		//Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
@@ -186,8 +186,8 @@ function animate() {
 		gl.vertexAttribPointer(renderVertexAttribute, 2, gl.FLOAT, false, 0, 0);
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-		iterations++;
-		time += 1.0;
+		u_iterations++;
+		u_time += 1.0;
 	}
 	window.requestAnimFrame(animate);
 }
@@ -278,7 +278,7 @@ function handleMouseMove(event) {
 	lastMouseX = newX;
 	lastMouseY = newY;
 
-	iterations = 0;
+	u_iterations = 0;
 }
 
 function handleKeyDown(event) {
@@ -286,32 +286,32 @@ function handleKeyDown(event) {
 		pause = !pause;
 	if (event.code == "KeyA") {
 		++keyboard[1];
-		iterations = 0;
+		u_iterations = 0;
 	}
 	if (event.code == "KeyD") {
 		--keyboard[1];
-		iterations = 0;
+		u_iterations = 0;
 	}
 	if (event.code == "KeyW") {
 		++keyboard[0];
-		iterations = 0;
+		u_iterations = 0;
 	}
 	if (event.code == "KeyS") {
 		--keyboard[0];
-		iterations = 0;
+		u_iterations = 0;
 	}
 	if (event.code == "ShiftLeft" || event.code == "ShiftRight") {
 		--keyboard[2];
-		iterations = 0;
+		u_iterations = 0;
 	}
 	if (event.code == "ControlLeft" || event.code == "ControlRight") {
 		++keyboard[2];
-		iterations = 0;
+		u_iterations = 0;
 	}
 }
 
 function change_render_mode(i) {
-	iterations = 0;
-	render_mode = i;
-	console.log("Changed render_mode to: " + render_mode);
+	u_iterations = 0;
+	u_render_mode = i;
+	console.log("Changed render_mode to: " + u_render_mode);
 }
