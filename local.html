@@ -1,27 +1,11 @@
 <!doctype html>
-<html lang="en"  style="background: #fafdfe">
+<html lang="en">
 
-<script src="/experiments/webgltracer/lib/gl-matrix.js" type="text/javascript"></script>
-<script src="/experiments/webgltracer/gl_utils.js" type="text/javascript"></script>
-<script src="/experiments/webgltracer/gl_run.js" type="text/javascript"></script>
+<script src="lib/gl-matrix.js" type="text/javascript"></script>
+<script src="gl_utils.js" type="text/javascript"></script>
+<script src="gl_run.js" type="text/javascript"></script>
 
 <head>
-	<!-- Global site tag (gtag.js) - Google Analytics -->
-	<script async src="https://www.googletagmanager.com/gtag/js?id=UA-91929483-3"></script>
-	<script>
-		window.dataLayer = window.dataLayer || [];
-		function gtag(){dataLayer.push(arguments);}
-		gtag('js', new Date());
-
-		gtag('config', 'UA-91929483-3');
-	</script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-	<script> 
-		$(function(){
-			$("#header").load("header.html"); 
-			$("#footer").load("footer.html"); 
-		});
-	</script>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 	<meta name="author" content="Paul-Elie Pipelin">
@@ -30,93 +14,75 @@
 	<meta name="theme-color" content="#36a1b0">
 
 	<title>Paul-Élie Pipelin - Webgl tracer</title>
-	<base href="/">
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+ <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 
-	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat|Playfair+Display:200,300|Quicksand:300,400|Roboto">
-	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.1/css/all.css" integrity="sha384-50oBUHEmvpQ+1lW4y57PTFmhCaXp0ML5d60M1M7uH2+nqUivzIebhndOJK28anvf" crossorigin="anonymous">
-	<link rel="stylesheet" href="styles.css">
-	<!-- <link rel="stylesheet" href="experiments/styles.css"> -->
-	<link rel="icon" type="image/x-icon" href="../assets/Torch.png">
+	<link rel="icon" type="image/x-icon" href="render.png">
 </head>
-
 <body>
-	<a class="finger hella bae-rock +" href="experiments/webgltracer">
-		english
-	</a>
-	<a class="finger hella bae-rock +" href="experiments/webgltracer">
-		français
-	</a>
-
-	<div id="header">
-		<h1 class="forehead undertow charming hella ++++">
-			Paul-Élie Pipelin
-		</h1>
-	</div>
-
 	<!------------------------------------------------>
+	
+	<div class="container tight">
+  <h1 class="my-4">
+   Webgltracer
+  </h1>
 
-	<nav class="tight stormsurge +++" aria-label="plunge" id="plunge">
-		<a class="finger bae-rock hella" href="">home</a>
-		<a class="finger bae-rock hella" href="experiments"><code>experiments</code></a>
-	</nav>
+  <p>
+   Shader can take time to compile at first (~20s). It can freeze browser during that delay, don't panic &#128578;.
+   <br>
+   /!\ WIP, see TODO below
+   <br>
+   Use mouse to move camera and keys (WASD/ZQSD + CTRL + SHIFT) to navigate through scene.
+   <br>
+   Not supported on phones.
+  </p>
 
-	<!------------------------------------------------>
-	<p>
-		Shader can take time to compile at first (~20s). It can freeze browser during that delay, don't panic &#128578;.
-		<br>
-		/!\ WIP, see TODO below
-		<br>
-		Use mouse to move camera and keys (WASD/ZQSD + CTRL + SHIFT) to navigate through scene.
-		<br>
-		Not supported on phones.
-	</p>
-	<input type="button" class="finger bae-rock hella" value="Raytracing" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0)" />
-	<div class="custom-control custom-switch" id="raytracing_shadow_dad">
-		<input type="checkbox" class="custom-control-input" id="raytracing_shadow" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0);" checked>
-		<label class="custom-control-label" for="raytracing_shadow">Shadowing</label>
+  <button onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0)">RayTracing</button>
+  <div class="custom-control custom-switch" id="raytracing_shadow_dad">
+   <input type="checkbox" class="custom-control-input" id="raytracing_shadow" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0);" checked>
+   <label class="custom-control-label" for="raytracing_shadow">Shadowing</label>
+  </div>
+ 
+  <button onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3:2);">Path Tracing</button>
+  <div class="custom-control custom-switch" id="pathtracing_naive_dad">
+   <input type="checkbox" class="custom-control-input" id="pathtracing_naive" onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3:2);">
+   <label class="custom-control-label" for="pathtracing_naive">Naive</label>
+  </div>
+ 
+  <br>
+ 
+  <div class="custom-control custom-switch" id="random_mode_dad">
+   <input type="checkbox" class="custom-control-input" id="random_mode" onclick="change_random_mode(document.getElementById('random_mode').checked ? 1:0);">
+   <label class="custom-control-label" for="random_mode">Fancy random</label>
+  </div>
+ 
+  <br>
+ 
+  <canvas id='canvas' width='512' height='512'></canvas>
+  <div id="message"></div>
+  <div id = "time"></div>
+  <br>
+ 
+  <ul>
+   <li>Fix imperfect handling of pdf for specular</li>
+   <li>Path tracing -- Naive OK, Iterative TOCHECK --> Light sampling method seems to introduce bias</li>
+   <li>Emissive triangles -- almost finished</li>
+   <li>Optical polisehd materials -- WIP --> triangles OK, verify spheres</li>
+   <li>CT GGX</li>
+   <li>Scene changing -- WIP --> problem at compile, seems to be related to shader's length</li>
+   <li>Light tracing</li>
+   <li>Import/export renders using 0-loss format</li>
+   <li>Moving objects</li>
+   <li>Anisotropy</li>
+   <li>Wavelength support</li>
+   <li>Iridescent material</li>
+   <li>Import blender scene</li>
+  </ul>
+  Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well which is pretty good. <br>
+  Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc" target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
 	</div>
-
-	<input class="finger bae-rock hella" type="button" value="Path Tracing" onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3:2);" />
-	<div class="custom-control custom-switch" id="pathtracing_naive_dad">
-		<input type="checkbox" class="custom-control-input" id="pathtracing_naive" onclick="change_render_mode(document.getElementById('pathtracing_naive').checked ? 3:2);">
-		<label class="custom-control-label" for="pathtracing_naive">Naive</label>
-	</div>
-
-	<br>
-
-	<div class="custom-control custom-switch" id="random_mode_dad">
-		<input type="checkbox" class="custom-control-input" id="random_mode" onclick="change_random_mode(document.getElementById('random_mode').checked ? 1:0);">
-		<label class="custom-control-label" for="random_mode">Fancy random</label>
-	</div>
-
-	<br>
-
-	<canvas id='canvas' width='512' height='512'></canvas>
-	<div id="message"></div>
-	<div id = "time"></div>
-	<br>
-
-	<ul>
-		<li>Fix imperfect handling of pdf for specular</li>
-		<li>Path tracing -- Naive OK, Iterative TOCHECK --> Light sampling method seems to introduce bias</li>
-		<li>Emissive triangles -- almost finished</li>
-		<li>Optical polisehd materials -- WIP --> triangles OK, verify spheres</li>
-		<li>CT GGX</li>
-		<li>Scene changing -- WIP --> problem at compile, seems to be related to shader's length</li>
-		<li>Light tracing</li>
-		<li>Import/export renders using 0-loss format</li>
-		<li>Moving objects</li>
-		<li>Anisotropy</li>
-		<li>Wavelength support</li>
-		<li>Iridescent material</li>
-		<li>Import blender scene</li>
-	</ul>
-	Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well which is pretty good. <br>
-	Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc" target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
-
-	<div id="footer" class="forehead +++"></div>
 </body>
 </html>
 
@@ -1061,6 +1027,7 @@
 
 	Scene scene;
 
+
 	void main() {
 		vec3 delta_p = vec3(11,0,0);
 			delta_p.x += keyboard.x;
@@ -1074,7 +1041,6 @@
 		vec2 rot_tech_xy = rot_tech.xy;
 		vec2 uv_swap = v_uv;
 		uv_swap.x = -v_uv.x + 1.0;
-
 
 		if(u_random_mode == 0)
 			seed = u_time * sin(u_time) + (gl_FragCoord.x+canvas.x*gl_FragCoord.y)/(canvas.y);
