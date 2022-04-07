@@ -1,5 +1,5 @@
 # WEBGLTracer
--------------
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ppipelin/webgltracer/pages%20build%20and%20deployment?label=github-pages)
 
 This is a WEBGL renderer.
 Currently supports Path tracing on triangles and spheres with reflective and transmissive materials.
