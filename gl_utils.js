@@ -28,8 +28,8 @@
 	// LOOK : Grabs the text shader source from the document for shader
 	// compilation
 	exports.getShaderSource = function (script) {
-		var str = "";
-		var k = script.firstChild;
+		const str = "";
+		const k = script.firstChild;
 		while (k) {
 			if (k.nodeType === 3) {
 				str += k.textContent;
@@ -50,7 +50,7 @@
 			message.innerText = "The browser does not support WebGL.  Visit http://get.webgl.org.";
 			return undefined;
 		}
-		var context = canvas.getContext("webgl2") || canvas.getContext("webgl");
+		const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
 
 		if (!context && message) {
 			message.innerText = "The browser supports WebGL, but initialization failed.";
@@ -61,9 +61,9 @@
 
 	// LOOK : Create program from the vertex and fragment shaders passed in 
 	exports.createProgram = function (context, vertexShaderSource, fragmentShaderSource, message) {
-		var program = context.createProgram();
-		var vs = context.createShader(context.VERTEX_SHADER);
-		var fs = context.createShader(context.FRAGMENT_SHADER);
+		const program = context.createProgram();
+		const vs = context.createShader(context.VERTEX_SHADER);
+		const fs = context.createShader(context.FRAGMENT_SHADER);
 
 		context.attachShader(program, vs);
 		context.attachShader(program, fs);
