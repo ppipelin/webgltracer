@@ -2,63 +2,63 @@ window.onload = runGL;
 
 "use strict";
 
-var gl;
-var canvas;
-var message;
+let gl;
+let canvas;
+let message;
 
-var shaderProgram;
-var angleX = 0;
-var angleY = 0;
-var keyboard = [0,0,0];
+let shaderProgram;
+let angleX = 0;
+let angleY = 0;
+let keyboard = [0, 0, 0];
 
 //Texture
-var textures;
+let textures;
 
 //Vertex Shader
-var VertexLocation;
+let VertexLocation;
 
 //Fragment Shader
-var u_timeLocation;
-var u_itrLocation;
-var u_render_modeLocation;
-var u_random_modeLocation;
-var u_sceneLocation;
-var u_textureLocation;
-var u_texsizeLocation;
-var u_texLocations = [];
-var u_mouseLocation;
-var u_keyboardLocation;
+let u_timeLocation;
+let u_itrLocation;
+let u_render_modeLocation;
+let u_random_modeLocation;
+let u_sceneLocation;
+let u_textureLocation;
+let u_texsizeLocation;
+let u_texLocations = [];
+let u_mouseLocation;
+let u_keyboardLocation;
 
 //render shader
-var renderProgram;
-var renderVertexAttribute;
-var vertexPositionBuffer;
-var frameBuffer;
-var u_textureLocationc;
+let renderProgram;
+let renderVertexAttribute;
+let vertexPositionBuffer;
+let frameBuffer;
+let u_textureLocationc;
 
-var u_time = 0;
-var u_iterations = 0;
-var u_render_mode = 2;
-var u_random_mode = 0;
-var u_scene = 0;
+let u_time = 0;
+let u_iterations = 0;
+let u_render_mode = 2;
+let u_random_mode = 0;
+let u_scene = 0;
 
 ///////////////////////////////////////////////////////////////////////////
 
 function runGL() {
-	var begin = Date.now();
+	let begin = Date.now();
 	initGL();
-	var end = Date.now();
-	document.getElementById("time").innerHTML +=  "Initialize WebGL: " + (end-begin).toString() + " ms<br/>";
-	
+	let end = Date.now();
+	document.getElementById("time").innerHTML += "Initialize WebGL: " + (end - begin).toString() + " ms<br/>";
+
 	begin = end;
 	initializeShader();
 	initBuffers();
-	
+
 	end = Date.now();
-	document.getElementById("time").innerHTML +=  "Initialize Shader: " + (end-begin).toString() + " ms<br/>";
+	document.getElementById("time").innerHTML += "Initialize Shader: " + (end - begin).toString() + " ms<br/>";
 
 	animate();
-	
+
 	//register
 	canvas.onmousedown = handleMouseDown;
 	// canvas.oncontextmenu = function (ev) { return false; };
@@ -69,11 +69,11 @@ function runGL() {
 
 ///////////////////////////////////////////////////////////////////////////
 
-function initGL(){
+function initGL() {
 	message = document.getElementById("message");
 	canvas = document.getElementById("canvas");
 	gl = createWebGLContext(canvas, message);
-	
+
 	if (!gl) {
 		alert("Could not initialise WebGL, sorry :-(");
 		return;
@@ -86,21 +86,21 @@ function initGL(){
 function initBuffers() {
 	vertexPositionBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
-	var vertices = [
-	 1.0, 1.0,
-	-1.0, 1.0,
-	 1.0, -1.0,
-	-1.0, -1.0,
+	const vertices = [
+		1.0, 1.0,
+		-1.0, 1.0,
+		1.0, -1.0,
+		-1.0, -1.0,
 	];
 
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 	gl.vertexAttribPointer(VertexLocation, 2, gl.FLOAT, false, 0, 0);
 
 	frameBuffer = gl.createFramebuffer();
-	var type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
+	const type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
 
 	textures = [];
-	for (var i = 0; i < 2; i++) {
+	for (let i = 0; i < 2; i++) {
 		textures.push(gl.createTexture());
 		gl.bindTexture(gl.TEXTURE_2D, textures[i]);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -112,8 +112,8 @@ function initBuffers() {
 
 function initializeShader() {
 	//create render shader
-	var renderVs = getShaderSource(document.getElementById("vs_render"));
-	var renderFs = getShaderSource(document.getElementById("fs_render"));
+	const renderVs = getShaderSource(document.getElementById("vs_render"));
+	const renderFs = getShaderSource(document.getElementById("fs_render"));
 
 	renderProgram = createProgram(gl, renderVs, renderFs, message);
 	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'i_vertex');
@@ -122,8 +122,8 @@ function initializeShader() {
 	u_textureLocationc = gl.getUniformLocation(renderProgram, "u_texture");
 
 	// Create path tracer shader
-	var vs = getShaderSource(document.getElementById("vs_pathTracer"));
-	var fs = getShaderSource(document.getElementById("fs_pathTracer"));
+	const vs = getShaderSource(document.getElementById("vs_pathTracer"));
+	const fs = getShaderSource(document.getElementById("fs_pathTracer"));
 
 	shaderProgram = createProgram(gl, vs, fs, message);
 
@@ -148,16 +148,16 @@ function initializeShader() {
 }
 
 function animate() {
-	
+
 	message.innerHTML = "Iterations: " + (u_iterations).toString();
 
-	if (!pause || u_iterations == 0) {
+	if (!pause || u_iterations === 0) {
 		///////////////////////////////////////////////////////////////////////////
 		// Render
 		gl.useProgram(shaderProgram);
 
 		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	
+
 		gl.uniform1f(u_timeLocation, u_time);
 		gl.uniform1i(u_itrLocation, u_iterations);
 		gl.uniform1i(u_render_modeLocation, u_render_mode);
@@ -165,7 +165,7 @@ function animate() {
 		gl.uniform1i(u_sceneLocation, u_scene);
 
 		//Added for texture size
-		gl.uniform2f(u_texsizeLocation, canvas.width,canvas.height);
+		gl.uniform2f(u_texsizeLocation, canvas.width, canvas.height);
 
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
@@ -179,7 +179,7 @@ function animate() {
 		gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
 		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, textures[1], 0);
 		gl.vertexAttribPointer(VertexLocation, 2, gl.FLOAT, false, 0, 0);
-		
+
 		gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
@@ -203,10 +203,10 @@ function animate() {
 function resize() {
 	canvas.width = width;
 	canvas.height = height;
-	
+
 	gl.viewport(0, 0, canvas.width, canvas.height);
-	
-	var type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
+
+	const type = gl.getExtension('OES_texture_float') ? gl.FLOAT : gl.UNSIGNED_BYTE;
 
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, textures[0]);
@@ -215,35 +215,35 @@ function resize() {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, canvas.width, canvas.height, 0, gl.RGB, type, null);
-	
+
 	gl.bindTexture(gl.TEXTURE_2D, null);
-	
+
 	iterations = 0;
 }
 
 // INTERACTION
 
-var mouseLeftDown = false;
-var mouseRightDown = false;
-var mouseMidDown = false;
-var lastMouseX = null;
-var lastMouseY = null;
+let mouseLeftDown = false;
+let mouseRightDown = false;
+let mouseMidDown = false;
+let lastMouseX = null;
+let lastMouseY = null;
 
-var pause = false;
+let pause = false;
 
 function handleMouseDown(event) {
-	if (event.button == 2) {
+	if (event.button === 2) {
 		mouseLeftDown = false;
 		mouseRightDown = true;
 		mouseMidDown = false;
 		return;
 	}
-	else if (event.button == 0) {
+	else if (event.button === 0) {
 		mouseLeftDown = true;
 		mouseRightDown = false;
 		mouseMidDown = false;
 	}
-	else if (event.button == 1) {
+	else if (event.button === 1) {
 		mouseLeftDown = false;
 		mouseRightDown = false;
 		mouseMidDown = true;
@@ -262,12 +262,12 @@ function handleMouseMove(event) {
 	if (!(mouseLeftDown || mouseRightDown || mouseMidDown)) {
 		return;
 	}
-	if(mouseRightDown) return;
-	var newX = event.clientX;
-	var newY = event.clientY;
+	if (mouseRightDown) return;
+	const newX = event.clientX;
+	const newY = event.clientY;
 
-	var deltaX = newX - lastMouseX;
-	var deltaY = newY - lastMouseY;
+	const deltaX = newX - lastMouseX;
+	const deltaY = newY - lastMouseY;
 
 	if (mouseLeftDown) {
 		// update the angles based on how far we moved since last time
