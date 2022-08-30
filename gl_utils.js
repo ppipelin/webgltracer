@@ -31,7 +31,7 @@
 		var str = "";
 		var k = script.firstChild;
 		while (k) {
-			if (k.nodeType == 3) {
+			if (k.nodeType === 3) {
 				str += k.textContent;
 			}
 			k = k.nextSibling;

@@ -151,7 +151,7 @@ function animate() {
 
 	message.innerHTML = "Iterations: " + (u_iterations).toString();
 
-	if (!pause || u_iterations == 0) {
+	if (!pause || u_iterations === 0) {
 		///////////////////////////////////////////////////////////////////////////
 		// Render
 		gl.useProgram(shaderProgram);
@@ -232,18 +232,18 @@ var lastMouseY = null;
 var pause = false;
 
 function handleMouseDown(event) {
-	if (event.button == 2) {
+	if (event.button === 2) {
 		mouseLeftDown = false;
 		mouseRightDown = true;
 		mouseMidDown = false;
 		return;
 	}
-	else if (event.button == 0) {
+	else if (event.button === 0) {
 		mouseLeftDown = true;
 		mouseRightDown = false;
 		mouseMidDown = false;
 	}
-	else if (event.button == 1) {
+	else if (event.button === 1) {
 		mouseLeftDown = false;
 		mouseRightDown = false;
 		mouseMidDown = true;
