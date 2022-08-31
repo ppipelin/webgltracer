@@ -28,8 +28,8 @@
 	// LOOK : Grabs the text shader source from the document for shader
 	// compilation
 	exports.getShaderSource = function (script) {
-		const str = "";
-		const k = script.firstChild;
+		let str = "";
+		let k = script.firstChild;
 		while (k) {
 			if (k.nodeType === 3) {
 				str += k.textContent;
