@@ -50,6 +50,8 @@
 			message.innerText = "The browser does not support WebGL.  Visit http://get.webgl.org.";
 			return undefined;
 		}
+
+		// First we get webgl 2
 		const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
 
 		if (!context && message) {
