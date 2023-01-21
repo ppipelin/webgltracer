@@ -136,10 +136,9 @@
 </body>
 </html>
 
-<script id="vs_pathTracer" type="x-shader/x-vertex">#version 300 es
-	in vec2 i_vertex;
+<script id="vs_pathTracer" type="x-shader/x-vertex">attribute vec2 i_vertex;
 
-	out vec2 v_uv;
+	varying vec2 v_uv;
 
 	void main() {
 		gl_Position = vec4(i_vertex, 0.0, 1.0);
@@ -148,8 +147,7 @@
 	}
 </script>
 
-<script id="fs_pathTracer" type="x-shader/x-fragment">#version 300 es
-	precision lowp float;
+<script id="fs_pathTracer" type="x-shader/x-fragment">precision lowp float;
 
 	#ifdef GL_FRAGMENT_PRECISION_HIGH
 		precision highp float;
@@ -173,8 +171,7 @@
 	
 	uniform int u_scene;
 
-	in vec2 v_uv;
-	out vec4 o_fragColor;
+	varying vec2 v_uv;
 
 	// VARIABLES
 
@@ -1033,11 +1030,11 @@
 			}
 			vec3 color_tex;
 			if(u_iterations > 0)
-				color_tex = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
+				color_tex = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
 			if(isColor(color_total))
 				res += (color_tex * float(u_iterations) + color_total) / (float(u_iterations) + 1.0);
 		} else
-			res = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
+			res = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
 		return res;
 	}
 
@@ -1063,12 +1060,12 @@
 
 				vec3 color_tex;
 				if(u_iterations > 0)
-					color_tex = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
+					color_tex = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
 				if(isColor(color_total))
 					res += (color_tex * float(u_iterations) + color_total) / (float(u_iterations) + 1.0);
 			}
 		} else
-			res = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
+			res = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
 
 		return res;
 	}
@@ -1128,11 +1125,11 @@
 			}
 			vec3 color_tex;
 			if(u_iterations > 0)
-				color_tex = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
+				color_tex = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // previous frame
 			if(isColor(color_total))
 				res = (color_tex * float(u_iterations) + color_total) / (float(u_iterations) + 1.0);
 		} else {
-			res = texture(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // Static image
+			res = texture2D(u_texture, vec2(gl_FragCoord.x / u_texsize.r, gl_FragCoord.y / u_texsize.g)).rgb; // Static image
 		}
 		return res;
 	}
@@ -1192,14 +1189,13 @@
 		}
 
 		color /= float(SPPPF);
-		o_fragColor = vec4(color, 1.0);
+		gl_FragColor = vec4(color, 1.0);
 	}
 </script>
-<script id="vs_render" type="x-shader/x-vertex">#version 300 es 
-	precision mediump float;
+<script id="vs_render" type="x-shader/x-vertex">precision mediump float;
 
-	in vec3 i_vertex;
-	out vec2 v_texCoord;
+	attribute vec3 i_vertex;
+	varying vec2 v_texCoord;
 
 	void main(void)
 	{
@@ -1208,12 +1204,10 @@
 	}
 
 </script>
-<script id="fs_render" type="x-shader/x-fragment">#version 300 es
-	precision mediump float;
+<script id="fs_render" type="x-shader/x-fragment">precision mediump float;
 
 	uniform sampler2D u_texture;
-	in vec2 v_texCoord;
-	out vec4 o_fragColor;
+	varying vec2 v_texCoord;
 
 	const float A = 0.15; // ShoulderStrength
 	const float B = 0.50; // LinearStrength
@@ -1255,10 +1249,10 @@
 
 	void main(void)
 	{
-		o_fragColor = texture(u_texture, v_texCoord);
+		gl_FragColor = texture2D(u_texture, v_texCoord);
 		
-		o_fragColor.rgb = ExposureCorrect(o_fragColor.rgb, 2.1, -0.8);
-		o_fragColor.rgb = ACESFilmicToneMapping(o_fragColor.rgb);
+		gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
+		gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
 	}
 
 </script>

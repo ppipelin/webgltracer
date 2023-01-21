@@ -51,8 +51,7 @@
 			return undefined;
 		}
 
-		// First we get webgl 2
-		const context = canvas.getContext("webgl2") || canvas.getContext("webgl");
+		var context = canvas.getContext("webgl");
 
 		if (!context && message) {
 			message.innerText = "The browser supports WebGL, but initialization failed.";
