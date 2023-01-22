@@ -38,7 +38,7 @@ let u_textureLocationc;
 
 let u_time = 0;
 let u_iterations = 0;
-let u_render_mode = 3;
+let u_render_mode = 4;
 let u_random_mode = 0;
 let u_scene = 0;
 

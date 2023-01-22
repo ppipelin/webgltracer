@@ -82,21 +82,21 @@
 	<input class="finger bae-rock hella" type="button" value="Path Tracing" onclick="change_render_mode(3); document.getElementById('flexRadioDefault1').checked = true;" />
 
 	<div class="form-check">
-		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault1" onclick="change_render_mode(3);" checked>
-		<label class="form-check-label" for="flexRadioDefault1", onclick="change_render_mode(3);">
-			Iterative
+		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault1" onclick="change_render_mode(2);">
+		<label class="form-check-label" for="flexRadioDefault1", onclick="change_render_mode(2);">
+			Naive
 		</label>
 	</div>
 	<div class="form-check">
-		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault2" onclick="change_render_mode(4);">
-		<label class="form-check-label" for="flexRadioDefault2" onclick="change_render_mode(4);">
+		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault2" onclick="change_render_mode(3);">
+		<label class="form-check-label" for="flexRadioDefault2" onclick="change_render_mode(3);">
 			Last vertex samples light
 		</label>
 	</div>
 	<div class="form-check">
-		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault3" onclick="change_render_mode(2);">
-		<label class="form-check-label" for="flexRadioDefault3" onclick="change_render_mode(2);">
-			Naive
+		<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault3" onclick="change_render_mode(4);" checked>
+		<label class="form-check-label" for="flexRadioDefault3" onclick="change_render_mode(4);">
+			Iterative
 		</label>
 	</div>
 
@@ -1179,11 +1179,11 @@
 			else if (u_render_mode == 1)
 				tmp = traceRay(ray, scene, true); // Raytracing shadowed
 			else if (u_render_mode == 2)
-				tmp = tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
-			else if (u_render_mode == 3)
 				tmp = tracePath(ray, scene, true, false); // Path tracing naive
-			else if (u_render_mode == 4)
+			else if (u_render_mode == 3)
 				tmp = tracePath(ray, scene, false, true); // Path tracing tmp (sample light on last vertex)
+			else if (u_render_mode == 4)
+				tmp = tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
 			if(isColor(tmp))
 				color += tmp;
 		}
