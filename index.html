@@ -198,7 +198,7 @@
 	const vec4 INITIAL_ROT_TECH = vec4(HALF_PI + 0.1,0,0,0);
 
 	// Rendering parameters
-	#define MAX_DEPTH 5
+	#define MAX_DEPTH 8
 	#define SPPPF 1
 	// const float epsilon = scene_scale * 0.005; // OLD
 	const float epsilon = scene_scale * 0.0001;
@@ -481,6 +481,11 @@
 
 	// FUNCTIONS SCENE
 	void addQuad(vec3 position, vec2 scale, vec3 axis, float angle, in Material material, inout Scene scene){
+		if (scene.nbTriangles + 2 > MAXTRIANGLES)
+		{
+			return;
+		}
+
 		mat3 R = rotationMatrix(axis, angle);
 		vec3 fl = R * vec3(-0.5*scale.x, -0.5*scale.y, 0) + position;
 		vec3 fr = R * vec3(-0.5*scale.x, 0.5*scale.y, 0) + position;
@@ -497,27 +502,30 @@
 
 		scene.nbTriangles += 2;
 
-		if(isEmissive(material)){
-			// Adding two lights so assert there is space (< MAXLIGHTS-1)
-			for (int k = 0; k < MAXLIGHTS-1; ++k){
+		if(isEmissive(material) && scene.nbLightTriangles + 1 <= MAXLIGHTS){
+			for (int k = 0; k < MAXLIGHTS; ++k){
 				if(k == scene.nbLightTriangles)
 					scene.light_triangles[k] = scene.nbTriangles-2; // k is a constant
 				if(k == scene.nbLightTriangles+1)
 					scene.light_triangles[k] = scene.nbTriangles-1; // k is a constant
 			}
 			scene.nbLightTriangles += 2;
-			scene.nbLights +=2;
+			scene.nbLights += 2;
 		}
 	}
 	
 	void addSphere(vec3 position, float radius, Material material, inout Scene scene){
+		if (scene.nbSpheres + 1 > MAXSPHERES)
+		{
+			return;
+		}
 		for (int k = 0; k < MAXSPHERES; ++k)
 			if(k == scene.nbSpheres)
 				scene.spheres[k] = Sphere(position, radius, radius*radius, material); // k is a constant
 		
 		scene.nbSpheres++;
 
-		if(isEmissive(material)){
+		if(isEmissive(material) && scene.nbLightSpheres + 1 <= MAXLIGHTS){
 			for (int k = 0; k < MAXLIGHTS; ++k)
 				if(k == scene.nbLightSpheres)
 					scene.light_spheres[k] = scene.nbSpheres-1;
@@ -552,6 +560,46 @@
 		addQuad(position + scale * vec3(-0.5,0,0), scale * vec2(1.0), vec3(0,1,0), HALF_PI, mat, scene);
 	}
 
+	void addTetrahedron(vec3 position, vec3 scale, vec3 axis, float angle, in Material material, inout Scene scene){
+		if (scene.nbTriangles + 4 > MAXTRIANGLES)
+		{
+			return;
+		}
+		mat3 R = rotationMatrix(axis, angle);
+		vec3 a = R * vec3(0) + position;
+		vec3 b = R * vec3(0, scale.y, 0) + position;
+		vec3 c = R * vec3(scale.x, 0, 0) + position;
+		vec3 top = R * vec3(0, 0, scale.z) + position;
+
+		for (int k = 0; k < MAXTRIANGLES; ++k)
+			if(k == scene.nbTriangles)
+				scene.triangles[k] = Triangle(a, b, c, material);
+			else if(k == scene.nbTriangles+1)
+				scene.triangles[k] = Triangle(a, b, top, material);
+			else if(k == scene.nbTriangles+2)
+				scene.triangles[k] = Triangle(a, c, top, material);
+			else if(k == scene.nbTriangles+3)
+				scene.triangles[k] = Triangle(b, c, top, material);
+
+		if (isEmissive(material) && scene.nbLightTriangles + 4 <= MAXLIGHTS)
+		{
+			for (int k = 0; k < MAXLIGHTS; ++k)
+				if(k == scene.nbTriangles)
+					scene.light_triangles[k] = scene.nbTriangles;
+				else if(k == scene.nbTriangles+1)
+					scene.light_triangles[k] = scene.nbTriangles+1;
+				else if(k == scene.nbTriangles+2)
+					scene.light_triangles[k] = scene.nbTriangles+2;
+				else if(k == scene.nbTriangles+3)
+					scene.light_triangles[k] = scene.nbTriangles+3;
+
+			scene.nbLightTriangles += 4;
+			scene.nbLights += 4;
+		}
+
+		scene.nbTriangles += 4;
+	}
+
 	void initSceneCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r){
 		// Camera
 		rotation += delta_r;
@@ -576,7 +624,7 @@
 		
 		// Lights
 		//Material mlight1 = Material(vec3(0), vec3(0, 0.25, 1) / factor, 0.0, 0, 0.0);
-		Material mlight1 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
+		Material mlight1 = Material(vec3(0), vec3(10) / factor, 0.0, 0, 0.0);
 		addSphere(center + scene_scale * vec3(0, 0, 2), scene_scale * factor, mlight1, scene); // BLUE
 		
 		//Material mlight2 = Material(vec3(0), vec3(1, 1, 0) / factor, 0.0, 0, 0.0);
@@ -614,7 +662,7 @@
 		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 3.0, msgloss2, scene);
 	}
 
-	void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r){
+	void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r, bool all_white){
 		// Camera
 		rotation += delta_r;
 		vec3 front = sphericalToCartesian(rotation);
@@ -631,14 +679,21 @@
 		Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0);
 		Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0);
 		
+		if(all_white)
+		{
+			diffuse_red = diffuse_white;
+			diffuse_green = diffuse_white;
+		}
+		
 		// Cornell
 		vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
 		addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
 		float factor = 0.3;
 		
 		// Lights
-		Material mlight1 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
-		addSphere(center + scene_scale * vec3(0,0,2), scene_scale * factor * 2.0, mlight1, scene); // WHITE
+		Material mlight1 = Material(vec3(0), vec3(1) / factor * 1.0, 0.0, 0, 0.0);
+		// Material mlight1 = Material(vec3(0), vec3(100) / factor, 0.0, 0, 0.0);
+		addSphere(center + scene_scale * vec3(0,0,3), scene_scale * factor * 5.0, mlight1, scene); // WHITE
 		// addQuad(center + scene_scale * vec3(0,0,2), scene_scale * factor * vec2(1.0) * 10.0, vec3(0,1,0), 0.0, mlight1, scene); // WHITE
 		
 		float eta0 = 1.000293; // Air
@@ -647,18 +702,21 @@
 		float eta3 = 2.417; // Diamond
 		float eta4 = 3.45; // Silicon
 		// Objects
-		addSphere(center + scene_scale * vec3(2,2,0.5), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,1,0.5), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
-		addSphere(center + scene_scale * vec3(2,-1,0.5), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-2,0.5), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
-
-		addSphere(center + scene_scale * vec3(2,2,-2), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,1,-2), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,-2), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
-		addSphere(center + scene_scale * vec3(2,-1,-2), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-2,-2), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
-
+		if (!all_white)
+		{
+			addSphere(center + scene_scale * vec3(2,2,0.5), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,1,0.5), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
+			addSphere(center + scene_scale * vec3(2,-1,0.5), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,-2,0.5), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
+	
+			addSphere(center + scene_scale * vec3(2,2,-2), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,1,-2), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,0,-2), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
+			addSphere(center + scene_scale * vec3(2,-1,-2), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
+			addSphere(center + scene_scale * vec3(2,-2,-2), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
+		}
+		
 		addSphere(center + scene_scale * vec3(0,2,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta0), scene);
 		addSphere(center + scene_scale * vec3(0,1,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta1), scene);
 		addSphere(center + scene_scale * vec3(0,0,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);		
@@ -667,9 +725,11 @@
 
 		addCube(center + scene_scale * vec3(0,2,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta0), scene);
 		addCube(center + scene_scale * vec3(0,1,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta1), scene);
-		addCube(center + scene_scale * vec3(0,0,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);		
+		addCube(center + scene_scale * vec3(0,0,-2), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
 		addCube(center + scene_scale * vec3(0,-1,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta3), scene);
 		addCube(center + scene_scale * vec3(0,-2,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta4), scene);
+
+		addTetrahedron(center + scene_scale * vec3(0,0,-2), vec3(scene_scale * 0.75) * 2.0, vec3(0,0,1), 135.0, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
 	}
 
 	// FUNCTIONS RENDERING
@@ -794,6 +854,66 @@
 		return worldToLocal(vec3(0,1,0), dir);
 	}
 
+	// wvl in nm
+	// http://www.physics.sfasu.edu/astro/color/spectra.html 
+	vec3 wvl_to_rgb(float wvl)
+	{
+		float Gamma = 0.80;
+		float factor, red, green, blue;
+
+		if((wvl >= 380.0) && (wvl<440.0)){
+			red = -(wvl - 440.0) / (440.0 - 380.0);
+			green = 0.0;
+			blue = 1.0;
+		}else if((wvl >= 440.0) && (wvl<490.0)){
+			red = 0.0;
+			green = (wvl - 440.0) / (490.0 - 440.0);
+			blue = 1.0;
+		}else if((wvl >= 490.0) && (wvl<510.0)){
+			red = 0.0;
+			green = 1.0;
+			blue = -(wvl - 510.0) / (510.0 - 490.0);
+		}else if((wvl >= 510.0) && (wvl<580.0)){
+			red = (wvl - 510.0) / (580.0 - 510.0);
+			green = 1.0;
+			blue = 0.0;
+		}else if((wvl >= 580.0) && (wvl<645.0)){
+			red = 1.0;
+			green = -(wvl - 645.0) / (645.0 - 580.0);
+			blue = 0.0;
+		}else if((wvl >= 645.0) && (wvl<781.0)){
+			red = 1.0;
+			green = 0.0;
+			blue = 0.0;
+		}else{
+			red = 0.0;
+			green = 0.0;
+			blue = 0.0;
+		};
+
+		// Let the intensity fall off near the vision limits
+		if((wvl >= 380.0) && (wvl<420.0)){
+			factor = 0.3 + 0.7*(wvl - 380.0) / (420.0 - 380.0);
+		}else if((wvl >= 420.0) && (wvl<701.0)){
+			factor = 1.0;
+		}else if((wvl >= 701.0) && (wvl<781.0)){
+			factor = 0.3 + 0.7*(780.0 - wvl) / (780.0 - 700.0);
+		}else{
+			factor = 0.0;
+		};
+
+		if (red != 0.0){
+			red = pow(red * factor, Gamma);
+		}
+		if (green != 0.0){
+			green = pow(green * factor, Gamma);
+		}
+		if (blue != 0.0){
+			blue = pow(blue * factor, Gamma);
+		}
+		return vec3(red,green,blue);
+	}
+
 	void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 beta_modifier){
 		vec3 old_dir_world = normalize(-inter.ray.direction);
 		vec2 old_dir_world_spherical = cartesianToSpherical(old_dir_world);
@@ -812,29 +932,60 @@
 			// Spectral dispersion
 			if(true)
 			{
-				int wvl_selection = int(rand1() * 3.0);
+				float picked_rnd = rand1();
+				float wvl_selection = picked_rnd * (750.0-350.0) + 350.0;
+				//int wvl_selection = int(floor(rand1() * 3.0));
+
 				if (inter.material.eta == 1.52 || inter.ray.eta == 1.52)
 				{
 					// GLASS
 					float new_eta = 1.52;
-					if (wvl_selection == 1)
-					{
-						new_eta = 1.5145; // 650nm
-						//new_eta = 1.01; // 650nm
-						beta_modifier = vec3(1, 0, 0);
-					}
-					if (wvl_selection == 2)
-					{
-						new_eta = 1.5208; // 510nm
-						//new_eta = 50.0; // 510nm
-						beta_modifier = vec3(0, 1, 0);
-					}
-					if (wvl_selection == 3)
-					{
-						new_eta = 1.5228; // 480nm
-						//new_eta = 100.0; // 480nm
-						beta_modifier = vec3(0, 0, 1);
-					}
+					float old_eta = inter.material.eta;
+					
+					
+					// if (wvl_selection == 0)
+					// {
+					// 	new_eta = 1.5145; // 650nm
+					// 	//new_eta = 1.01; // 650nm
+					// 	beta_modifier = vec3(1, 0, 0);
+					// }
+					// if (wvl_selection == 1)
+					// {
+					// 	new_eta = 1.5208; // 510nm
+					// 	//new_eta = 50.0; // 510nm
+					// 	beta_modifier = vec3(0, 1, 0);
+					// }
+					// if (wvl_selection == 2)
+					// {
+					// 	new_eta = 1.5228; // 480nm
+					// 	//new_eta = 100.0; // 480nm
+					// 	beta_modifier = vec3(0, 0, 1);
+					// }
+					// 
+					// beta_modifier = beta_modifier*3.0;
+
+					// if (wvl_selection <= 483.333)
+					// {
+					// 	beta_modifier = vec3(1, 0, 0);
+					// }
+					// if (wvl_selection > 483.333 && wvl_selection < 666.666)
+					// {
+					// 	beta_modifier = vec3(0, 1, 0);
+					// }
+					// if (wvl_selection >= 666.666)
+					// {
+					// 	beta_modifier = vec3(0, 0, 1);
+					// }
+
+					beta_modifier = wvl_to_rgb(wvl_selection);
+
+					// new_eta = picked_rnd * 0.5 + 1.0;
+					//new_eta = picked_rnd * (1.5228 - 1.5145) + 1.5145;
+					new_eta = picked_rnd * (3.4 - 1.5) + 1.5;
+					// beta_modifier = beta_modifier*(750.0-350.0);
+
+					// new_eta = picked_rnd * (4.0 - 1.5) + 1.5;
+					// new_eta = picked_rnd * (old_eta * 2.0 - old_eta - 0.5) + old_eta - 0.5;
 
 					if (inter.material.eta == 1.52)
 					{
@@ -1070,7 +1221,7 @@
 		return res;
 	}
 
-	vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool tmp) {
+	vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 		// res is pixel color
 		// color_total is computed color (needs to be scaled based on u_iterations)
 		// beta is propagating color
@@ -1091,17 +1242,16 @@
 					if(isEmissive(inter.material)) {
 						if(depth == 0 || naive || spec_last) {
 							color_total += beta * inter.material.emissive; // lights do not have albedo // TODO: study different kind of lights
-						} else if(tmp && depth < MAX_DEPTH-1) {
+						} else if(lastLight && depth < MAX_DEPTH-1) {
 							color_total += beta * inter.material.emissive;
 						}
 					} else if(!spec_current) {
 						// Light sampling
-						if(!naive && !tmp) { // Iterative PT
+						if(!naive) { // Iterative PT
 							// color_total += beta * sampleAllLights(scene, inter);
-							color_total += beta * sampleOneLight(scene, inter);
-						} else if(tmp && depth == MAX_DEPTH-1) { // To sample light only at last vertex
-							// color_total += beta * sampleAllLights(scene, inter);
-							color_total += beta * sampleOneLight(scene, inter);
+							if(!lastLight || lastLight && depth == MAX_DEPTH-1) {
+								color_total += beta * sampleOneLight(scene, inter);
+							}
 						}
 					}
 
@@ -1160,7 +1310,8 @@
 		else if(u_random_mode == 3)
 			seed = u_time;
 
-		initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+		//initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+		initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r, false);
 		//if(u_scene == 0)
 		//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 		//else
@@ -1181,7 +1332,7 @@
 			else if (u_render_mode == 2)
 				tmp = tracePath(ray, scene, true, false); // Path tracing naive
 			else if (u_render_mode == 3)
-				tmp = tracePath(ray, scene, false, true); // Path tracing tmp (sample light on last vertex)
+				tmp = tracePath(ray, scene, false, true); // Path tracing last (sample light on last vertex)
 			else if (u_render_mode == 4)
 				tmp = tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
 			if(isColor(tmp))
