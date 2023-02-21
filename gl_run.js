@@ -38,7 +38,7 @@ let u_textureLocationc;
 
 let u_time = 0;
 let u_iterations = 0;
-let u_render_mode = 2;
+let u_render_mode = 4;
 let u_random_mode = 0;
 let u_scene = 0;
 
@@ -144,7 +144,6 @@ function initializeShader() {
 	// Move
 	u_mouseLocation = gl.getUniformLocation(shaderProgram, "mouse");
 	u_keyboardLocation = gl.getUniformLocation(shaderProgram, "keyboard");
-
 }
 
 function animate() {
@@ -275,8 +274,8 @@ function handleMouseMove(event) {
 		angleX += deltaY * 0.01;
 
 		// don't go upside down
-		angleX = Math.max(angleX, -Math.PI / 2 + 0.01);
-		angleX = Math.min(angleX, Math.PI / 2 - 0.01);
+		// angleX = Math.max(angleX, -Math.PI / 2 + 0.01);
+		// angleX = Math.min(angleX, Math.PI / 2 - 0.01);
 	}
 	else if (mouseRightDown) {
 	}
