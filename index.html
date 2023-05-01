@@ -292,6 +292,11 @@
 	// END_STRUCTURES
 
 	// FUNCTIONS MISC
+	bool isNan(float val)
+	{
+		return (val <= 0.0 || 0.0 <= val) ? false : true;
+	}
+
 	void swap(inout float a, inout float b) {
 		float tmp = a;
 		a = b;
@@ -820,10 +825,10 @@
 			float cosThetaT = sqrt(1.0 - sin2ThetaT);
 			sampled = eta * -(-inter.ray.direction) + (eta * cost - cosThetaT) * inter.normal;
 			
-			pdf *= 1.0; // / (1.0 - fresnel_term);
+			pdf *= 1.0 / (1.0 - fresnel_term);
 		} 
 		else {
-			pdf *= 1.0; // / fresnel_term;
+			pdf *= 1.0 / fresnel_term;
 			float void_pdf;
 			return sample_mirror(inter, void_pdf);
 		}
@@ -1089,8 +1094,10 @@
 		pointToSample = normalize(pointToSample);
 
 		float bsdf = BSDF(inter.material, cartesianToSpherical(-inter.ray.direction), cartesianToSpherical(pointToSample));
-		float cosi = dot(inter.normal, pointToSample);
+		float cosi = abs(dot(inter.normal, pointToSample));
 		vec3 prod = bsdf * cosi * inter.material.albedo; // bounce toward light prod, called f in pbrt
+
+		if (isNan(prod[0]) || isNan(prod[1]) || isNan(prod[2])) prod = vec3(0); // Sub optimal fix
 
 		if(!isBlack(prod)) {
 			Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample, 1.0); // Better correlates with naive
