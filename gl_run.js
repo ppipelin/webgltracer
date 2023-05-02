@@ -112,8 +112,8 @@ function initBuffers() {
 
 function initializeShader() {
 	//create render shader
-	const renderVs = getShaderSource(document.getElementById("vs_render"));
-	const renderFs = getShaderSource(document.getElementById("fs_render"));
+	const renderVs = window.shaders.vs_render;
+	const renderFs = window.shaders.fs_render;
 
 	renderProgram = createProgram(gl, renderVs, renderFs, message);
 	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'i_vertex');
@@ -122,8 +122,8 @@ function initializeShader() {
 	u_textureLocationc = gl.getUniformLocation(renderProgram, "u_texture");
 
 	// Create path tracer shader
-	const vs = getShaderSource(document.getElementById("vs_pathTracer"));
-	const fs = getShaderSource(document.getElementById("fs_pathTracer"));
+	const vs = window.shaders.vs_pathTracer;
+	const fs = window.shaders.fs_pathTracer;
 
 	shaderProgram = createProgram(gl, vs, fs, message);
 
