@@ -34,7 +34,7 @@ let renderProgram;
 let renderVertexAttribute;
 let vertexPositionBuffer;
 let frameBuffer;
-let u_textureLocationc;
+let u_textureLocation;
 
 let u_time = 0;
 let u_iterations = 0;
@@ -119,7 +119,7 @@ function initializeShader() {
 	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'i_vertex');
 	gl.enableVertexAttribArray(renderVertexAttribute);
 
-	u_textureLocationc = gl.getUniformLocation(renderProgram, "u_texture");
+	u_textureLocation = gl.getUniformLocation(renderProgram, "u_texture");
 
 	// Create path tracer shader
 	const vs = window.shaders.vs_pathTracer;
@@ -187,7 +187,7 @@ function animate() {
 		gl.useProgram(renderProgram);
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-		gl.uniform1i(u_textureLocationc, 0);
+		gl.uniform1i(u_textureLocation, 0);
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
 		gl.vertexAttribPointer(renderVertexAttribute, 2, gl.FLOAT, false, 0, 0);
