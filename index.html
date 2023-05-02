@@ -9,28 +9,34 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 	<meta name="author" content="Paul-Elie Pipelin">
 	<meta name="description" content="Webgl tracer. Personal site of Paul-Elie Pipelin, engineer in digital imaging.">
-	<meta name="keywords" content="WEBGL, Tracer, Raytracing, Pathtracing, Rendering, Engineer, Paul-Elie, Pipelin, Digital, Imaging, Computer, Graphics">
+	<meta name="keywords"
+		content="WEBGL, Tracer, Raytracing, Pathtracing, Rendering, Engineer, Paul-Elie, Pipelin, Digital, Imaging, Computer, Graphics">
 	<meta name="theme-color" content="#36a1b0">
-	
+
 	<title>Paul-Élie Pipelin - Webgl tracer</title>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+		integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+	<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
+		integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
+		crossorigin="anonymous"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-	
+
 	<link rel="icon" type="image/x-icon" href="render.png">
 </head>
+
 <body>
 	<!------------------------------------------------>
-	
+
 	<div class="container tight">
 		<h1 class="my-4">
 			Webgltracer
 		</h1>
-		
+
 		<!------------------------------------------------>
 		<p>
-			Shader can take time to compile at first (~20s). It can freeze browser during that delay, don't panic &#128578;.
+			Shader can take time to compile at first (~20s). It can freeze browser during that delay, don't panic
+			&#128578;.
 			<br>
 			/!\ WIP, see TODO below
 			<br>
@@ -39,48 +45,55 @@
 			Not supported on phones.
 		</p>
 		<input type="button" class="finger bae-rock hella" value="Normals" onclick="change_render_mode(-1)" />
-		
-		<input type="button" class="finger bae-rock hella" value="Raytracing" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0)" />
+
+		<input type="button" class="finger bae-rock hella" value="Raytracing"
+			onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0)" />
 		<div class="custom-control custom-switch" id="raytracing_shadow_dad">
-			<input type="checkbox" class="custom-control-input" id="raytracing_shadow" onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0);" checked>
+			<input type="checkbox" class="custom-control-input" id="raytracing_shadow"
+				onclick="change_render_mode(document.getElementById('raytracing_shadow').checked ? 1:0);" checked>
 			<label class="custom-control-label" for="raytracing_shadow">Shadowing</label>
 		</div>
-		
-		<input class="finger bae-rock hella" type="button" value="Path Tracing" onclick="change_render_mode(3); document.getElementById('flexRadioDefault1').checked = true;" />
-		
+
+		<input class="finger bae-rock hella" type="button" value="Path Tracing"
+			onclick="change_render_mode(3); document.getElementById('flexRadioDefault1').checked = true;" />
+
 		<div class="form-check">
-			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault1" onclick="change_render_mode(2);">
-			<label class="form-check-label" for="flexRadioDefault1", onclick="change_render_mode(2);">
+			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault1"
+				onclick="change_render_mode(2);">
+			<label class="form-check-label" for="flexRadioDefault1" , onclick="change_render_mode(2);">
 				Naive
 			</label>
 		</div>
 		<div class="form-check">
-			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault2" onclick="change_render_mode(3);">
+			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault2"
+				onclick="change_render_mode(3);">
 			<label class="form-check-label" for="flexRadioDefault2" onclick="change_render_mode(3);">
 				Last vertex samples light
 			</label>
 		</div>
 		<div class="form-check">
-			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault3" onclick="change_render_mode(4);" checked>
+			<input class="form-check-input" type="radio" name="flexRadioDefault" id="flexRadioDefault3"
+				onclick="change_render_mode(4);" checked>
 			<label class="form-check-label" for="flexRadioDefault3" onclick="change_render_mode(4);">
 				Iterative
 			</label>
 		</div>
-		
+
 		<br>
-		
+
 		<div class="custom-control custom-switch" id="random_mode_dad">
-			<input type="checkbox" class="custom-control-input" id="random_mode" onclick="change_random_mode(document.getElementById('random_mode').checked ? 1:0);">
+			<input type="checkbox" class="custom-control-input" id="random_mode"
+				onclick="change_random_mode(document.getElementById('random_mode').checked ? 1:0);">
 			<label class="custom-control-label" for="random_mode">Fancy random</label>
 		</div>
-		
+
 		<br>
-		
+
 		<canvas id='canvas' width='512' height='512'></canvas>
 		<div id="message"></div>
-		<div id = "time"></div>
+		<div id="time"></div>
 		<br>
-		
+
 		<ul>
 			<li>Fix imperfect handling of pdf for specular</li>
 			<li>Path tracing -- Naive OK, Iterative TOCHECK --> Light sampling method seems to introduce bias</li>
@@ -96,10 +109,14 @@
 			<li>Iridescent material</li>
 			<li>Import blender scene</li>
 		</ul>
-		Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well which is pretty good. <br>
-		Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc" target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
+		Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/"
+			target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well
+		which is pretty good. <br>
+		Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc"
+			target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
 	</div>
 </body>
+
 </html>
 
 <script src="vs_pathTracer.js"></script>

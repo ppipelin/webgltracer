@@ -84,14 +84,14 @@ struct Material{
 	int bsdf_number; // 0 is lambert, 1 is mirror, 2 is optical polished
 	float eta;
 };
-	
+
 struct Sphere{
 	vec3 position;
 	float radius;
 	float radius2;
 	Material material;
 };
-	
+
 struct Triangle{
 	vec3 v0;
 	vec3 v1;
@@ -118,19 +118,19 @@ struct Ray{
 	vec3 direction;
 	float eta;
 };
-	
+
 struct SurfaceLightSample{
 	float pdf;
 	vec3 point;
 	vec3 normal;
 };
-	
+
 struct DirectionSample{
 	float pdf;
 	float bsdf;
 	vec3 direction;
 };
-	
+
 struct Intersection{
 	bool hit;
 	vec3 point;
@@ -185,7 +185,7 @@ vec3 rotate(vec3 axis, float angle, vec3 v) {
 	float s = sin(angle * 0.5);
 	vec3 u = axis * s;
 	float w = cos(angle * 0.5);
-	
+
 	return 2.0 * dot(v, u) * u +
 					(w*w  - dot(u,u)) * v +
 					2.0 * w * cross(u, v);
@@ -216,10 +216,10 @@ mat3 rotationMatrix(vec3 axis, float angle)	{
 }
 
 Ray makeRay(vec2 uv, in Camera camera) {
-	vec3 direction = camera.front - 
-		camera.right * (0.5 - uv.x) * camera.plane.x - 
+	vec3 direction = camera.front -
+		camera.right * (0.5 - uv.x) * camera.plane.x -
 		camera.down * (0.5 - uv.y) * camera.plane.y;
-	
+
 	return Ray(camera.position, normalize(direction), 1.0);
 }
 
@@ -257,7 +257,7 @@ bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection curr
 	} else t = t2;
 	if(t > currentInter.t && currentInter.hit) return true;
 	vec3 point = ray.origin + t * ray.direction;
-	vec3 normal = (point - sphere.position) / sphere.radius;   
+	vec3 normal = (point - sphere.position) / sphere.radius;
 	currentInter = inter_succeeded(point, t, normal, ray, sphere.material, -1, sptr);
 	return true;
 }
@@ -453,7 +453,6 @@ void addTetrahedron(vec3 position, vec3 scale, vec3 axis, float angle, in Materi
 		scene.nbLightTriangles += 4;
 		scene.nbLights += 4;
 	}
-
 	scene.nbTriangles += 4;
 }
 
@@ -462,28 +461,28 @@ void initSceneCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	rotation += delta_r;
 	vec3 front = sphericalToCartesian(rotation);
 	vec3 right = normalize(cross(UP, front));
-	
+
 	position += front * delta_p.x;
 	position += right * delta_p.y;
 	position.z += delta_p.z;
-	
+
 	vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
 	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
-	
+
 	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
 	Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0);
 	Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0);
-	
+
 	// Cornell
 	vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
 	addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
 	float factor = 0.3;
-	
+
 	// Lights
 	//Material mlight1 = Material(vec3(0), vec3(0, 0.25, 1) / factor, 0.0, 0, 0.0);
 	Material mlight1 = Material(vec3(0), vec3(10) / factor, 0.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(0, 0, 2), scene_scale * factor, mlight1, scene); // BLUE
-	
+
 	//Material mlight2 = Material(vec3(0), vec3(1, 1, 0) / factor, 0.0, 0, 0.0);
 	Material mlight2 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
 	//addSphere(center + scene_scale * vec3(-1, -1.5, -1.75), scene_scale * 2.0 * factor, mlight2, scene); // YELLOW
@@ -495,26 +494,26 @@ void initSceneCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	//Material mlight4 = Material(vec3(0), vec3(0, 0.97, 0.1) / factor, 0.0, 0, 0.0);
 	Material mlight4 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
 	//addCube(center + scene_scale * vec3(2, -2, 0), scene_scale * 1.5 * factor, mlight4, scene); // GREEN
-	
+
 	// Cubes
 	addCube(center + scene_scale * vec3(-1,1.5,-1.5), scene_scale, Material(vec3(1), vec3(0), 0.0, 2, 1.52), scene); // Adds fresnel cube
 
 	// Spheres
 	Material msdiffp = Material(vec3(1), vec3(0), 0.0, 2, 1.52);
 	addSphere(center + scene_scale * vec3(1,-1,-1), scene_scale * factor * 3.0, msdiffp, scene);
-	
+
 	Material msdiffy = Material(vec3(1,1,0), vec3(0), 0.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(1,-3,2), scene_scale * factor * 7.0, msdiffy, scene);
-	
+
 	Material msgloss1 = Material(vec3(0.3,0.9,0.9), vec3(0), 10.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(1,2,-1), scene_scale * factor * 5.0, msgloss1, scene);
-	
+
 	Material msspec1 = Material(vec3(1.0,0.5,0.3), vec3(0), 1000.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(0,0,-8), scene_scale * factor * 20.0, msspec1, scene);
-	
+
 	Material msspec2 = Material(vec3(1.0,1.0,1.0), vec3(0), 50000.0, 1, 0.0);
 	addSphere(center + scene_scale * vec3(5,5,5), scene_scale * factor * 20.0, msspec2, scene);
-	
+
 	Material msgloss2 = Material(vec3(1.0,0.0,0.7), vec3(0), 1.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 3.0, msgloss2, scene);
 }
@@ -524,35 +523,35 @@ void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	rotation += delta_r;
 	vec3 front = sphericalToCartesian(rotation);
 	vec3 right = normalize(cross(UP, front));
-	
+
 	position += front * delta_p.x;
 	position += right * delta_p.y;
 	position.z += delta_p.z;
-	
+
 	vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
 	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
-	
+
 	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
 	Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0);
 	Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0);
-	
+
 	if(all_white)
 	{
 		diffuse_red = diffuse_white;
 		diffuse_green = diffuse_white;
 	}
-	
+
 	// Cornell
 	vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
 	addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
 	float factor = 0.3;
-	
+
 	// Lights
 	Material mlight1 = Material(vec3(0), vec3(1) / factor * 1.0, 0.0, 0, 0.0);
 	// Material mlight1 = Material(vec3(0), vec3(100) / factor, 0.0, 0, 0.0);
 	addSphere(center + scene_scale * vec3(0,0,3), scene_scale * factor * 5.0, mlight1, scene); // WHITE
 	// addQuad(center + scene_scale * vec3(0,0,2), scene_scale * factor * vec2(1.0) * 10.0, vec3(0,1,0), 0.0, mlight1, scene); // WHITE
-	
+
 	float eta0 = 1.000293; // Air
 	float eta1 = 1.33; // Water
 	float eta2 = 1.52; // Glass
@@ -563,20 +562,20 @@ void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	{
 		addSphere(center + scene_scale * vec3(2,2,0.5), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,1,0.5), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
+		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,-1,0.5), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,-2,0.5), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
 
 		addSphere(center + scene_scale * vec3(2,2,-2), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,1,-2), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,-2), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);		
+		addSphere(center + scene_scale * vec3(2,0,-2), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,-1,-2), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
 		addSphere(center + scene_scale * vec3(2,-2,-2), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
 	}
-	
+
 	addSphere(center + scene_scale * vec3(0,2,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta0), scene);
 	addSphere(center + scene_scale * vec3(0,1,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta1), scene);
-	addSphere(center + scene_scale * vec3(0,0,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);		
+	addSphere(center + scene_scale * vec3(0,0,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
 	addSphere(center + scene_scale * vec3(0,-1,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta3), scene);
 	addSphere(center + scene_scale * vec3(0,-2,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta4), scene);
 
@@ -635,7 +634,7 @@ float FrDielectric(float cosThetaI, float etaI, float etaT) {
 		cosThetaI = abs(cosThetaI);
 	}
 
-	// Snells law 
+	// Snells law
 	// Since sin2(x) + cos2(x) = 1
 	float sinThetaI = sqrt(max(0.0, 1.0 - cosThetaI * cosThetaI));
 	float sinThetaT = etaI / etaT * sinThetaI;
@@ -676,9 +675,9 @@ vec3 sample_fresnel(in Intersection inter, inout float pdf) {
 		if (sin2ThetaT >= 1.0) return vec3(0);
 		float cosThetaT = sqrt(1.0 - sin2ThetaT);
 		sampled = eta * -(-inter.ray.direction) + (eta * cost - cosThetaT) * inter.normal;
-		
+
 		pdf *= 1.0 / (1.0 - fresnel_term);
-	} 
+	}
 	else {
 		pdf *= 1.0 / fresnel_term;
 		float void_pdf;
@@ -689,11 +688,11 @@ vec3 sample_fresnel(in Intersection inter, inout float pdf) {
 }
 
 void createCoordinateSystem(in vec3 normal, out vec3 Nt, out vec3 Nb) {
-	if (abs(normal.x) > abs(normal.y)) 
-		Nt = vec3(normal.z, 0, -normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z); 
-	else 
-		Nt = vec3(0, -normal.z, normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z); 
-	Nb = cross(normal, Nt); 
+	if (abs(normal.x) > abs(normal.y))
+		Nt = vec3(normal.z, 0, -normal.x) / sqrt(normal.x * normal.x + normal.z * normal.z);
+	else
+		Nt = vec3(0, -normal.z, normal.y) / sqrt(normal.y * normal.y + normal.z * normal.z);
+	Nb = cross(normal, Nt);
 }
 
 // https://www.scratchapixel.com/lessons/3d-basic-rendering/global-illumination-path-tracing/global-illumination-path-tracing-practical-implementation
@@ -701,8 +700,8 @@ vec3 worldToLocal(in vec3 normal , vec3 dir) {
 	vec3 Nt, Nb;
 	createCoordinateSystem(normal, Nt, Nb);
 	return vec3(
-		dir.x * Nb.x + dir.y * normal.x + dir.z * Nt.x, 
-		dir.x * Nb.y + dir.y * normal.y + dir.z * Nt.y, 
+		dir.x * Nb.x + dir.y * normal.x + dir.z * Nt.x,
+		dir.x * Nb.y + dir.y * normal.y + dir.z * Nt.y,
 		dir.x * Nb.z + dir.y * normal.z + dir.z * Nt.z);
 }
 
@@ -712,7 +711,7 @@ vec3 localToWorld(vec3 dir) {
 }
 
 // wvl in nm
-// http://www.physics.sfasu.edu/astro/color/spectra.html 
+// http://www.physics.sfasu.edu/astro/color/spectra.html
 vec3 wvl_to_rgb(float wvl)
 {
 	float Gamma = 0.80;
@@ -798,8 +797,8 @@ void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 bet
 				// GLASS
 				float new_eta = 1.52;
 				float old_eta = inter.material.eta;
-				
-				
+
+
 				// if (wvl_selection == 0)
 				// {
 				// 	new_eta = 1.5145; // 650nm
@@ -818,7 +817,7 @@ void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 bet
 				// 	//new_eta = 100.0; // 480nm
 				// 	beta_modifier = vec3(0, 0, 1);
 				// }
-				// 
+				//
 				// beta_modifier = beta_modifier*3.0;
 
 				// if (wvl_selection <= 483.333)
@@ -906,23 +905,23 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	main_direction /= d;
 	float d2 = d*d;
 	float sinthetamax = sphere.radius /d;
-	
+
 	// float thetamax = asin(sinthetamax);
 	float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax);//cos(thetamax);
-	
+
 	highp float costheta = 1.0 - rand1()  * (1.0 - costhetamax);
-	
+
 	float sintheta = sqrt(1.0 - costheta * costheta);//sin(acos(costheta))
 	highp float phi = rand1() * TWO_PI;
-	
+
 	// D = 1 - d² sin² θ / r²
 	float sintheta2 =  sintheta * sintheta;
 	float D = 1.0 - d2 * sintheta2 / sphere.radius2;
 	bool D_positive = D > 0.0;
-	
+
 	float cosalpha = float(D_positive) * (sintheta2 / sinthetamax + costheta * sqrt(abs(D)))
 					+ float(!D_positive) * sinthetamax;
-	
+
 	float sinalpha = sin(acos(cosalpha));//sqrt(1.0 - cosalpha * cosalpha);
 
 	vec3 direction = vec3(sinalpha * cos(phi), sinalpha * sin(phi), cosalpha);
@@ -1061,8 +1060,8 @@ vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 				// Shadowed ?
 				if(!shadow){
 					color_total += dot(-ray.direction, inter.normal) * inter.material.albedo;
-				} 
-				else 
+				}
+				else
 				{
 					color_total += sampleAllLights(scene, inter);
 				}
@@ -1092,7 +1091,7 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 
 	if(u_iterations <= PATHS_NB) {
 		Intersection inter;
-		
+
 		for(int depth = 0; depth < MAX_DEPTH; ++depth) {
 			inter = inter_dummy(ray); // needed to init hit to false
 			if(raySceneIntersection(ray, scene, inter)) {
@@ -1122,12 +1121,12 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 				ray = Ray(inter.point + ds.direction*epsilon, ds.direction, inter.material.eta);
 
 				float acost = abs(dot(ds.direction, inter.normal));
-				
+
 				beta *= acost * inter.material.albedo * beta_modifier; // beta propagates cosine, albedo and bsdf value through the path
 				if(!spec_last)
 					beta *= ds.bsdf / ds.pdf;
 				if(ds.pdf <= 0.0 || beta == vec3(0)) break; // No prod (skymap or light touched) or no prob (opposite hemisphere sampling)
-			} 
+			}
 			else {
 				break; // No intersect
 			}
@@ -1165,7 +1164,7 @@ void main() {
 	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 	//else
 	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	
+
 	vec3 color;
 
 	for(int i = 1 ; i <= SPPPF; ++i) // Make SPPPF samples per pixel per frame
@@ -1199,4 +1198,4 @@ void main() {
 
 	color /= float(SPPPF);
 	gl_FragColor = vec4(color, 1.0);
-}`
+}`;
