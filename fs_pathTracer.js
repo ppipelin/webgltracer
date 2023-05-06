@@ -8,20 +8,26 @@ window.shaders.fs_pathTracer = /* glsl */ `precision lowp float;
 #endif
 
 uniform highp float u_time;
+uniform int u_objnums;
 
 uniform int u_iterations;
 uniform sampler2D u_texture;
+uniform sampler2D attrtexture;
 
 uniform vec2 u_mouse;
 uniform vec3 u_keyboard;
 
 uniform vec2 u_texsize;
+uniform vec2 attrtexsize;
 
 uniform int u_render_mode;
 
 uniform int u_random_mode;
 
 uniform int u_scene;
+
+const int MAX_OBJ_NUM = 30;
+const int numberOfObjects = MAX_OBJ_NUM;
 
 varying vec2 v_uv;
 
