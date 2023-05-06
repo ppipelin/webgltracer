@@ -45,7 +45,6 @@ highp float seed;
 const float scene_scale = 1.0;
 const float translation_speed = 10.0 * scene_scale;
 const float rotation_speed = 0.1;
-const vec3 canvas = vec3(512,512,0);
 const vec4 INITIAL_POS_SPP = scene_scale * vec4(-40.0,0.0,-10.0,1.0);
 const vec4 INITIAL_ROT_TECH = vec4(HALF_PI + 0.1,0,0,0);
 
@@ -466,7 +465,7 @@ void initSceneCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	position += right * delta_p.y;
 	position.z += delta_p.z;
 
-	vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
+	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
 	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
 
 	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
@@ -528,7 +527,7 @@ void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inou
 	position += right * delta_p.y;
 	position.z += delta_p.z;
 
-	vec2 cplane = vec2(canvas.x,canvas.y) / ((canvas.x+canvas.y)/2.0);
+	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
 	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
 
 	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
@@ -1146,12 +1145,12 @@ Scene scene;
 
 void main() {
 	vec3 delta_p = vec3(11,0,0);
-		delta_p.x += keyboard.x;
-		delta_p.y += keyboard.y;
-		delta_p.z += keyboard.z;
+		delta_p.x += u_keyboard.x;
+		delta_p.y += u_keyboard.y;
+		delta_p.z += u_keyboard.z;
 	vec2 delta_r = vec2(0);
-		delta_r.x += mouse.x * rotation_speed;
-		delta_r.y += mouse.y * rotation_speed;
+		delta_r.x += u_mouse.x * rotation_speed;
+		delta_r.y += u_mouse.y * rotation_speed;
 	vec4 pos_spp = INITIAL_POS_SPP; //(memorized location)
 	vec4 rot_tech = INITIAL_ROT_TECH;
 	vec2 rot_tech_xy = rot_tech.xy;
@@ -1170,7 +1169,7 @@ void main() {
 	for(int i = 1 ; i <= SPPPF; ++i) // Make SPPPF samples per pixel per frame
 	{
 		if(u_random_mode == 0)
-			seed = u_time * sin(u_time) + (gl_FragCoord.x + canvas.x * gl_FragCoord.y) / canvas.y;
+			seed = u_time * sin(u_time) + (gl_FragCoord.x + u_texsize.r * gl_FragCoord.y) / u_texsize.g;
 		else if(u_random_mode == 1)
 			seed = u_time;
 		else if(u_random_mode == 2)

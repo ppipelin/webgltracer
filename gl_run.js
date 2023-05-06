@@ -9,7 +9,7 @@ let message;
 let shaderProgram;
 let angleX = 0;
 let angleY = 0;
-let keyboard = [0, 0, 0];
+let u_keyboard = [0, 0, 0];
 
 //Texture
 let textures;
@@ -29,12 +29,12 @@ let u_texLocations = [];
 let u_mouseLocation;
 let u_keyboardLocation;
 
-//render shader
+// Render shader
 let renderProgram;
 let renderVertexAttribute;
 let vertexPositionBuffer;
 let frameBuffer;
-let u_textureLocation;
+let u_textureLocationc;
 
 let u_time = 0;
 let u_iterations = 0;
@@ -111,7 +111,7 @@ function initBuffers() {
 }
 
 function initializeShader() {
-	//create render shader
+	// Create render shader
 	const renderVs = window.shaders.vs_render;
 	const renderFs = window.shaders.fs_render;
 
@@ -119,7 +119,7 @@ function initializeShader() {
 	renderVertexAttribute = gl.getAttribLocation(renderProgram, 'i_vertex');
 	gl.enableVertexAttribArray(renderVertexAttribute);
 
-	u_textureLocation = gl.getUniformLocation(renderProgram, "u_texture");
+	u_textureLocationc = gl.getUniformLocation(renderProgram, "u_texture");
 
 	// Create path tracer shader
 	const vs = window.shaders.vs_pathTracer;
@@ -131,7 +131,7 @@ function initializeShader() {
 	VertexLocation = gl.getAttribLocation(shaderProgram, "i_vertex");
 	gl.enableVertexAttribArray(VertexLocation);
 
-	// Fragment Shader        
+	// Fragment Shader
 	u_timeLocation = gl.getUniformLocation(shaderProgram, "u_time");
 	u_itrLocation = gl.getUniformLocation(shaderProgram, "u_iterations");
 	u_render_modeLocation = gl.getUniformLocation(shaderProgram, "u_render_mode");
@@ -142,8 +142,8 @@ function initializeShader() {
 	u_texsizeLocation = gl.getUniformLocation(shaderProgram, "u_texsize");
 
 	// Move
-	u_mouseLocation = gl.getUniformLocation(shaderProgram, "mouse");
-	u_keyboardLocation = gl.getUniformLocation(shaderProgram, "keyboard");
+	u_mouseLocation = gl.getUniformLocation(shaderProgram, "u_mouse");
+	u_keyboardLocation = gl.getUniformLocation(shaderProgram, "u_keyboard");
 }
 
 function animate() {
@@ -163,7 +163,7 @@ function animate() {
 		gl.uniform1i(u_random_modeLocation, u_random_mode);
 		gl.uniform1i(u_sceneLocation, u_scene);
 
-		//Added for texture size
+		// Added for texture size
 		gl.uniform2f(u_texsizeLocation, canvas.width, canvas.height);
 
 		gl.activeTexture(gl.TEXTURE0);
@@ -172,7 +172,7 @@ function animate() {
 
 		// Move 
 		gl.uniform2f(u_mouseLocation, angleX, angleY);
-		gl.uniform3f(u_keyboardLocation, keyboard[0], keyboard[1], keyboard[2]);
+		gl.uniform3f(u_keyboardLocation, u_keyboard[0], u_keyboard[1], u_keyboard[2]);
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
 		gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
@@ -187,7 +187,7 @@ function animate() {
 		gl.useProgram(renderProgram);
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, textures[0]);
-		gl.uniform1i(u_textureLocation, 0);
+		gl.uniform1i(u_textureLocationc, 0);
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, vertexPositionBuffer);
 		gl.vertexAttribPointer(renderVertexAttribute, 2, gl.FLOAT, false, 0, 0);
@@ -199,7 +199,7 @@ function animate() {
 	window.requestAnimFrame(animate);
 }
 
-function resize() {
+function resize(width, height) {
 	canvas.width = width;
 	canvas.height = height;
 
@@ -217,7 +217,7 @@ function resize() {
 
 	gl.bindTexture(gl.TEXTURE_2D, null);
 
-	iterations = 0;
+	u_iterations = 0;
 }
 
 // INTERACTION
@@ -292,27 +292,27 @@ function handleKeyDown(event) {
 	if (event.code == "Space")
 		pause = !pause;
 	if (event.code == "KeyA") {
-		++keyboard[1];
+		++u_keyboard[1];
 		u_iterations = 0;
 	}
 	if (event.code == "KeyD") {
-		--keyboard[1];
+		--u_keyboard[1];
 		u_iterations = 0;
 	}
 	if (event.code == "KeyW") {
-		++keyboard[0];
+		++u_keyboard[0];
 		u_iterations = 0;
 	}
 	if (event.code == "KeyS") {
-		--keyboard[0];
+		--u_keyboard[0];
 		u_iterations = 0;
 	}
 	if (event.code == "ShiftLeft" || event.code == "ShiftRight") {
-		--keyboard[2];
+		--u_keyboard[2];
 		u_iterations = 0;
 	}
 	if (event.code == "ControlLeft" || event.code == "ControlRight") {
-		++keyboard[2];
+		++u_keyboard[2];
 		u_iterations = 0;
 	}
 }
