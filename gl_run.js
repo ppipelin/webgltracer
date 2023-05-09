@@ -237,7 +237,7 @@ function AddObjsAttr(i) {
 	// texturetype:[0.0,5.0] to [0,255]
 	attributes[21 * i + 1] = 255.0 * Datas[i].obj_textureType / 5.0;
 	// bsdf_number: [0.0, 3.0] to[0, 255]
-	attributes[21 * i + 2] = 255.0 * Datas[i].bsdf_number / 3.0;
+	attributes[21 * i + 2] = 255.0 * Datas[i].obj_bsdf_number / 3.0;
 	// vertices:[-100.0,100.0] to [0,255] times 3
 	const mind = -100.0;
 	const maxd = 100.0;
@@ -267,6 +267,26 @@ function AddObjsAttr(i) {
 	attributes[21 * i + 20] = 255.0;
 }
 
+function addSphere() {
+	if (Datas.length == 31)
+		return;
+	Datas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [Math.random() * 100.0 - 50.0, Math.random() * 100.0 - 50.0, Math.random() * 100.0 - 50.0],
+		obj_v2: [0.0, 0.0, 0.0],
+		obj_v3: [0.0, 0.0, 0.0],
+		obj_bsdf_number: Math.random() * 3.0,
+		obj_albedo: [Math.random(), Math.random(), Math.random()],
+		obj_emissive: [Math.random(), Math.random(), Math.random()],
+		obj_eta: Math.random() * 10.0,
+		obj_shininess: Math.random(),
+	});
+
+	AddObjsAttr(Datas.length - 1);
+
+	u_iterations = 0;
+}
 
 function addTriangle() {
 	if (Datas.length == 31)
@@ -277,7 +297,7 @@ function addTriangle() {
 		obj_v1: [Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0],
 		obj_v2: [Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0],
 		obj_v3: [Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0, Math.random() * 200.0 - 50.0],
-		bsdf_number: Math.random() * 3.0,
+		obj_bsdf_number: Math.random() * 3.0,
 		obj_albedo: [Math.random(), Math.random(), Math.random()],
 		obj_emissive: [Math.random(), Math.random(), Math.random()],
 		obj_eta: Math.random() * 10.0,
@@ -289,25 +309,64 @@ function addTriangle() {
 	u_iterations = 0;
 }
 
-var sphereNum = 3;
+function rotationMatrix(axis, angle) {
+	const ratio = Math.sqrt(axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2);
+	axis[0] = axis[0] / ratio;
+	axis[1] = axis[1] / ratio;
+	axis[2] = axis[2] / ratio;
+	s = Math.sin(angle / 180 * Math.PI);
+	c = Math.cos(angle / 180 * Math.PI);
+	oc = 1.0 - c;
+	return glMatrix.mat3.fromValues(oc * axis[0] * axis[0] + c, oc * axis[0] * axis[1] - axis[2] * s, oc * axis[2] * axis[0] + axis[1] * s,
+		oc * axis[0] * axis[1] + axis[2] * s, oc * axis[1] * axis[1] + c, oc * axis[1] * axis[2] - axis[0] * s,
+		oc * axis[2] * axis[0] - axis[1] * s, oc * axis[1] * axis[2] + axis[0] * s, oc * axis[2] * axis[2] + c);
+}
 
-function addSphere() {
-	if (Datas.length == 31)
+function addQuad(datas, position, scale = glMatrix.vec2.fromValues(1, 1), axis = glMatrix.vec3.fromValues(0, 0, 1), angle = 0, obj_bsdf_number = 0, obj_albedo = glMatrix.vec3.fromValues(1, 1, 1), obj_emissive = glMatrix.vec3.fromValues(0, 0, 0), obj_eta = 1.5, obj_shininess = 0) {
+	if (datas.length == 31)
 		return;
-	Datas.push({
-		obj_type: 0,
+
+	R = rotationMatrix(axis, angle);
+
+	fl = glMatrix.vec3.create();
+	glMatrix.vec3.transformMat3(fl, glMatrix.vec3.fromValues(-0.5 * scale[0], -0.5 * scale[1], 0), R);
+	glMatrix.vec3.add(fl, fl, position);
+	fr = glMatrix.vec3.create();
+	glMatrix.vec3.transformMat3(fr, glMatrix.vec3.fromValues(-0.5 * scale[0], 0.5 * scale[1], 0), R);
+	glMatrix.vec3.add(fr, fr, position);
+	bl = glMatrix.vec3.create();
+	glMatrix.vec3.transformMat3(bl, glMatrix.vec3.fromValues(0.5 * scale[0], -0.5 * scale[1], 0), R);
+	glMatrix.vec3.add(bl, bl, position);
+	br = glMatrix.vec3.create();
+	glMatrix.vec3.transformMat3(br, glMatrix.vec3.fromValues(0.5 * scale[0], 0.5 * scale[1], 0), R);
+	glMatrix.vec3.add(br, br, position);
+	datas.push({
+		obj_type: 1,
 		obj_textureType: 0,
-		obj_v1: [Math.random() * 100.0 - 50.0, Math.random() * 100.0 - 50.0, Math.random() * 100.0 - 50.0],
-		obj_v2: [0.0, 0.0, 0.0],
-		obj_v3: [0.0, 0.0, 0.0],
-		bsdf_number: Math.random() * 3.0,
-		obj_albedo: [Math.random(), Math.random(), Math.random()],
-		obj_emissive: [Math.random(), Math.random(), Math.random()],
-		obj_eta: Math.random() * 10.0,
-		obj_shininess: Math.random(),
+		obj_v1: fl,
+		obj_v2: fr,
+		obj_v3: br,
+		obj_bsdf_number: obj_bsdf_number,
+		obj_albedo: obj_albedo,
+		obj_emissive: obj_emissive,
+		obj_eta: obj_eta,
+		obj_shininess: obj_shininess
 	});
 
-	AddObjsAttr(Datas.length - 1);
+	datas.push({
+		obj_type: 1,
+		obj_textureType: 0,
+		obj_v1: br,
+		obj_v2: bl,
+		obj_v3: fl,
+		obj_bsdf_number: obj_bsdf_number,
+		obj_albedo: obj_albedo,
+		obj_emissive: obj_emissive,
+		obj_eta: obj_eta,
+		obj_shininess: obj_shininess
+	});
+
+	// AddObjsAttr(datas.length - 1);
 
 	u_iterations = 0;
 }
@@ -317,15 +376,29 @@ function initDefaultScene() {
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
-		obj_v1: [0, 0, 5],
-		obj_v2: [1, 0, 0],
+		obj_v1: [0, 0, 4],
+		obj_v2: [3, 0, 0],
 		obj_v3: [0, 0, 0],
-		bsdf_number: 0,
-		obj_albedo: [1, 1, 1],
-		obj_emissive: [0.5, 1, 1],
-		obj_eta: 1.0,
+		obj_bsdf_number: 0,
+		obj_albedo: [0, 0, 0],
+		obj_emissive: [1, 1, 1],
+		obj_eta: 0.0,
 		obj_shininess: 0,
 	});
+
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [5, 5, 4],
+		obj_v2: [2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 0,
+		obj_albedo: [0, 0, 0],
+		obj_emissive: [0.5, 1, 1],
+		obj_eta: 0.0,
+		obj_shininess: 0,
+	});
+
 
 	DefaultDatas.push({
 		obj_type: 0,
@@ -333,42 +406,78 @@ function initDefaultScene() {
 		obj_v1: [0, 0, 0],
 		obj_v2: [1, 0, 0],
 		obj_v3: [0, 0, 0],
-		bsdf_number: 0,
+		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
 		obj_emissive: [0, 0, 0],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
 
-	// Ground
+	// Cornell
 
 	const size = 10;
-	const height = -5;
-	DefaultDatas.push({
-		obj_type: 1,
-		obj_textureType: 0,
-		obj_v1: [size, size, height],
-		obj_v2: [size, -size, height],
-		obj_v3: [-size, size, height],
-		bsdf_number: 0,
-		obj_albedo: [1, 1, 1],
-		obj_emissive: [0, 0, 0],
-		obj_eta: 1.0,
-		obj_shininess: 0,
-	});
+	const height = 5;
 
-	DefaultDatas.push({
-		obj_type: 1,
-		obj_textureType: 0,
-		obj_v1: [size, -size, height],
-		obj_v2: [-size, -size, height],
-		obj_v3: [-size, size, height],
-		bsdf_number: 0,
-		obj_albedo: [1, 1, 1],
-		obj_emissive: [0, 0, 0],
-		obj_eta: 1.0,
-		obj_shininess: 0,
-	});
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(0, 0, -height),
+		/* scale */ glMatrix.vec2.fromValues(size, size),
+		/* axis */ glMatrix.vec3.fromValues(0, 0, 1),
+		/* angle */ 0,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(0, 0, height),
+		/* scale */ glMatrix.vec2.fromValues(size, size),
+		/* axis */ glMatrix.vec3.fromValues(0, 0, 1),
+		/* angle */ 0,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(0, -size / 2, 0),
+		/* scale */ glMatrix.vec2.fromValues(size, size),
+		/* axis */ glMatrix.vec3.fromValues(1, 0, 0),
+		/* angle */ 90,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(0, size / 2, 0),
+		/* scale */ glMatrix.vec2.fromValues(size, size),
+		/* axis */ glMatrix.vec3.fromValues(1, 0, 0),
+		/* angle */ 90,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(size / 2, 0, 0),
+		/* scale */ glMatrix.vec2.fromValues(size, size),
+		/* axis */ glMatrix.vec3.fromValues(0, 1, 0),
+		/* angle */ 90,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
 
 	defaultScene();
 }

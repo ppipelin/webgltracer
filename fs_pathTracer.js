@@ -140,8 +140,7 @@ struct Intersection{
 	vec3 normal;
 	Ray ray;
 	Material material;
-	int tptr;
-	int sptr;
+	int ptr;
 };
 // END_STRUCTURES
 
@@ -227,22 +226,22 @@ Ray makeRay(vec2 uv, in Camera camera) {
 
 Intersection inter_dummy(in Ray ray) {
 	const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
-	return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
+	return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0);
 }
 
-Intersection inter_succeeded(vec3 point, float t, vec3 normal, in Ray ray, in Material material, int tptr, int sptr){
+Intersection inter_succeeded(vec3 point, float t, vec3 normal, in Ray ray, in Material material, int ptr){
 	bool ok = dot(ray.direction, normal) <= 0.0;
 	normal *= (1.0 * float(ok) - 1.0 * float(!ok));
 	// Assert not to close to 90 degrees
 	if (dot(ray.direction, normal) > -epsilon)
 	{
 		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
-		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
+		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0);
 	}
-	return Intersection(true, point, t, normal, ray, material, tptr, sptr);
+	return Intersection(true, point, t, normal, ray, material, ptr);
 }
 
-bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection currentInter, int sptr){
+bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection currentInter, int ptr){
 	vec3 oc = ray.origin - sphere.position;
 	float b = dot( oc, ray.direction );
 	float c = dot( oc, oc ) - sphere.radius2;
@@ -257,15 +256,15 @@ bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection curr
 		if(t2 > 0.0) t = min(t1,t2);
 		else t = t1;
 	} else t = t2;
-	if(t > currentInter.t && currentInter.hit) return true;
+	if(currentInter.hit && t > currentInter.t) return true;
 	vec3 point = ray.origin + t * ray.direction;
 	vec3 normal = (point - sphere.position) / sphere.radius;
-	currentInter = inter_succeeded(point, t, normal, ray, sphere.material, -1, sptr);
+	currentInter = inter_succeeded(point, t, normal, ray, sphere.material, ptr);
 	return true;
 }
 
 // triangle designed by vertices v0, v1 and v2
-bool rayTriangleIntersection(in Ray ray, in Triangle tri, inout Intersection currentInter, int tptr)
+bool rayTriangleIntersection(in Ray ray, in Triangle tri, inout Intersection currentInter, int ptr)
 {
 	vec3 v1v0 = tri.v1 - tri.v0;
 	vec3 v2v0 = tri.v2 - tri.v0;
@@ -277,15 +276,16 @@ bool rayTriangleIntersection(in Ray ray, in Triangle tri, inout Intersection cur
 	float v = d*dot(  q, v1v0 );
 	float t = d*dot( -n, rov0 );
 	if(u < 0.0 || u > 1.0 || v < 0.0 || (u + v) > 1.0 || t <= 0.0) return false;
-	if(t > currentInter.t && currentInter.hit) return true;
+	if(currentInter.hit && t > currentInter.t) return true;
 	vec3 point = ray.origin + ray.direction * t;
-	currentInter = inter_succeeded(point, t, normalize(n), ray, tri.material, tptr, -1);
+	currentInter = inter_succeeded(point, t, normalize(n), ray, tri.material, ptr);
 	return true;
 }
 
 bool raySceneIntersection(in Ray ray, inout Intersection inter){
 	float attw = u_attrtexsize.r;
 	float atth = u_attrtexsize.g;
+	int inter_selected = -1;
 	for (int i = 0; i < numberOfObjects; ++i){
 		if (i >= u_objnums)
 			break;
@@ -300,14 +300,9 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
 			float radius = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r - 0.5);
 			Sphere tmp = Sphere(position, radius, radius*radius, dummy_mat);
-			if (raySphereIntersection(ray, tmp, inter, i))
+			if (raySphereIntersection(ray, tmp, inter, i) && inter.ptr == i)
 			{
-				vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
-				vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-				float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
-				float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
-				int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
-				inter.material = Material(albedo, emissive, shininess, bsdf_number, eta);
+				inter_selected = i;
 			}
 		}
 		else if (type == 1)
@@ -316,16 +311,23 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 			vec3 v2 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
 			vec3 v3 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
 			Triangle tmp = Triangle(v1, v2, v3, dummy_mat);
-			if (rayTriangleIntersection(ray, tmp, inter, i))
+			if (rayTriangleIntersection(ray, tmp, inter, i) && inter.ptr == i)
 			{
-				vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
-				vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-				float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
-				float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
-				int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
-				inter.material = Material(albedo, emissive, shininess, bsdf_number, eta);
+				inter_selected = i;
 			}
 		}
+	}
+	// Compute material from texture once we found the closest intersecting
+	if (inter_selected != -1)
+	{
+		float fix = float(inter_selected);
+		float fiy = 0.0;
+		vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
+		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
+		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
+		float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
+		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
+		inter.material = Material(albedo, emissive, shininess, bsdf_number, eta);
 	}
 	return inter.hit;
 }
@@ -338,7 +340,7 @@ bool visibility(in Ray ray, vec3 point){
 
 // FUNCTIONS MATERIALS
 bool isEmissive(const in Material mat){
-	return mat.emissive.r > 0.0 || mat.emissive.g > 0.0 || mat.emissive.b > 0.0;
+	return mat.emissive.r > epsilon || mat.emissive.g > epsilon || mat.emissive.b > epsilon;
 }
 
 bool isColor(vec3 c) {
@@ -1017,14 +1019,14 @@ vec3 traceNormals(in Ray ray, bool xray) {
 	return res;
 }
 
-vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
+vec3 traceRay(in Ray ray, bool shadow) {
 	vec3 res = vec3(0);
 	vec3 color_total;
 	if(u_iterations <= PATHS_NB) {
 		Intersection inter;
 		inter = inter_dummy(ray);
-		if(raySceneIntersection(ray, scene, inter)) {
-			if(!isBlack(inter.material.emissive)) {
+		if(raySceneIntersection(ray, inter)) {
+			if(isEmissive(inter.material)) {
 				color_total += inter.material.emissive;
 			} else {
 				// Shadowed ?
@@ -1033,7 +1035,7 @@ vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 				}
 				else
 				{
-					color_total += sampleAllLights(scene, inter);
+					color_total += sampleAllLights(inter);
 				}
 			}
 
@@ -1049,7 +1051,7 @@ vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 	return res;
 }
 
-vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
+vec3 tracePath(in Ray ray, bool naive, bool lastLight) {
 	// res is pixel color
 	// color_total is computed color (needs to be scaled based on u_iterations)
 	// beta is propagating color
@@ -1064,7 +1066,7 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 
 		for(int depth = 0; depth < MAX_DEPTH; ++depth) {
 			inter = inter_dummy(ray); // needed to init hit to false
-			if(raySceneIntersection(ray, scene, inter)) {
+			if(raySceneIntersection(ray, inter)) {
 				spec_current = inter.material.bsdf_number == 1 || inter.material.bsdf_number == 2;
 				// Emissive material
 				if(isEmissive(inter.material)) {
@@ -1076,9 +1078,9 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 				} else if(!spec_current) {
 					// Light sampling
 					if(!naive) { // Iterative PT
-						// color_total += beta * sampleAllLights(scene, inter);
+						// color_total += beta * sampleAllLights(inter);
 						if(!lastLight || lastLight && depth == MAX_DEPTH-1) {
-							color_total += beta * sampleOneLight(scene, inter);
+							color_total += beta * sampleOneLight(inter);
 						}
 					}
 				}
@@ -1112,28 +1114,40 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 	return res;
 }
 
-Scene scene;
+// Scene scene;
 
 void main() {
-	vec3 delta_p = vec3(11,0,0);
-		delta_p.x += u_keyboard.x;
-		delta_p.y += u_keyboard.y;
-		delta_p.z += u_keyboard.z;
+	vec3 delta_p = vec3(0,0,0);
+	delta_p.x += u_keyboard.x;
+	delta_p.y += u_keyboard.y;
+	delta_p.z += u_keyboard.z;
 	vec2 delta_r = vec2(0);
-		delta_r.x += u_mouse.x * rotation_speed;
-		delta_r.y += u_mouse.y * rotation_speed;
-	vec4 pos_spp = INITIAL_POS_SPP; //(memorized location)
-	vec4 rot_tech = INITIAL_ROT_TECH;
-	vec2 rot_tech_xy = rot_tech.xy;
+	delta_r.x += u_mouse.x * rotation_speed;
+	delta_r.y += u_mouse.y * rotation_speed;
 	vec2 uv_swap = v_uv;
 	uv_swap.x = -v_uv.x + 1.0;
 
-	//initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r, false);
+	// initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+	// initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r, false);
 	//if(u_scene == 0)
 	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 	//else
 	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+
+	// Initialize from attr
+	vec3 position = vec3(-15, -0.35, 0);
+	vec2 rotation = vec2(HALF_PI, 0);
+
+	rotation += delta_r;
+	vec3 front = sphericalToCartesian(rotation);
+	vec3 right = normalize(cross(UP, front));
+
+	position += front * delta_p.x;
+	position += right * delta_p.y;
+	position.z += delta_p.z;
+
+	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
+	Camera camera = makeCameraFromFrontRight(position, front, right, cplane);
 
 	vec3 color;
 
