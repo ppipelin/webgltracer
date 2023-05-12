@@ -873,8 +873,8 @@ vec3 computeIllumination(in Intersection inter, in SurfaceLightSample sls, in ve
 		float V = float(visibility(ray_light, sls.point));
 		vec3 Li = V * Le;
 
-		vec3 color_current_light =  Li * prod;
-		return color_current_light;
+		vec3 color_current_light = Li * prod;
+		return color_current_light / pdf_light;
 	}
 }
 
