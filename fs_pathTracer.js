@@ -12,8 +12,8 @@ uniform highp float u_time;
 uniform int u_iterations;
 uniform sampler2D u_texture;
 
-uniform vec2 mouse;
-uniform vec3 keyboard;
+uniform vec2 u_mouse;
+uniform vec3 u_keyboard;
 
 uniform vec2 u_texsize;
 
