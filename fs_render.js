@@ -34,6 +34,7 @@ vec3 LinearToGamma(vec3 linRGB){
 	return max(1.055 * pow(linRGB, vec3(0.416666667)) - 0.055, vec3(0.));
 }
 
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 vec3 ACESFilmicToneMapping(vec3 col){
 	vec3 curr = Uncharted2Tonemap(col);
 	const float ExposureBias = 2.0;
@@ -46,7 +47,7 @@ void main(void)
 {
 	gl_FragColor = texture2D(u_texture, v_texCoord);
 
-	gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
+	gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 20.0, -0.8);
 	gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
 }
 `;

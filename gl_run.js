@@ -20,6 +20,7 @@ let VertexLocation;
 
 //Fragment Shader
 let u_numsLocation;
+let u_lightsLocation;
 let u_timeLocation;
 let u_itrLocation;
 let u_render_modeLocation;
@@ -37,7 +38,7 @@ let u_keyboardLocation;
 // Width and height must be pow(2,n)
 let attw = 1024; // width
 let atth = 2; // height
-var attributes = new Uint8Array(attw * atth * 4);
+let attributes = new Uint8Array(attw * atth * 4);
 
 // Render shader
 let renderProgram;
@@ -156,6 +157,7 @@ function initializeShader() {
 	u_timeLocation = gl.getUniformLocation(shaderProgram, "u_time");
 	u_itrLocation = gl.getUniformLocation(shaderProgram, "u_iterations");
 	u_numsLocation = gl.getUniformLocation(shaderProgram, "u_objnums");
+	u_lightsLocation = gl.getUniformLocation(shaderProgram, "u_lights");
 	u_render_modeLocation = gl.getUniformLocation(shaderProgram, "u_render_mode");
 	u_random_modeLocation = gl.getUniformLocation(shaderProgram, "u_random_mode");
 	u_sceneLocation = gl.getUniformLocation(shaderProgram, "u_scene");
@@ -184,6 +186,11 @@ function animate() {
 		gl.uniform1f(u_timeLocation, u_time);
 		gl.uniform1i(u_itrLocation, u_iterations);
 		gl.uniform1i(u_numsLocation, Datas.length);
+		let numlights = 0;
+		for (let i = 0; i < Datas.length; i++)
+			if (Datas[i].obj_emissive[0] != 0.0 && Datas[i].obj_emissive[1] != 0.0 && Datas[i].obj_emissive[2] != 0.0)
+				numlights++;
+		gl.uniform1i(u_lightsLocation, numlights);
 		gl.uniform1i(u_render_modeLocation, u_render_mode);
 		gl.uniform1i(u_random_modeLocation, u_random_mode);
 		gl.uniform1i(u_sceneLocation, u_scene);
@@ -366,55 +373,168 @@ function addQuad(datas, position, scale = glMatrix.vec2.fromValues(1, 1), axis =
 		obj_shininess: obj_shininess
 	});
 
-	// AddObjsAttr(datas.length - 1);
-
 	u_iterations = 0;
 }
 
 function initDefaultScene() {
 	// Light
-	DefaultDatas.push({
-		obj_type: 0,
-		obj_textureType: 0,
-		obj_v1: [0, 0, 4],
-		obj_v2: [3, 0, 0],
-		obj_v3: [0, 0, 0],
-		obj_bsdf_number: 0,
-		obj_albedo: [0, 0, 0],
-		obj_emissive: [1, 1, 1],
-		obj_eta: 0.0,
-		obj_shininess: 0,
-	});
+	// DefaultDatas.push({
+	// 	obj_type: 0,
+	// 	obj_textureType: 0,
+	// 	obj_v1: [0, 0, 10],
+	// 	obj_v2: [6, 0, 0],
+	// 	obj_v3: [0, 0, 0],
+	// 	obj_bsdf_number: 0,
+	// 	obj_albedo: [0, 0, 0],
+	// 	obj_emissive: [0.5, 0.5, 0.5],
+	// 	obj_eta: 0.0,
+	// 	obj_shininess: 0,
+	// });
 
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
 		obj_v1: [5, 5, 4],
-		obj_v2: [2, 0, 0],
+		obj_v2: [(4 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
-		obj_albedo: [0, 0, 0],
-		obj_emissive: [0.5, 1, 1],
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [1, 0.8, 0.8],
 		obj_eta: 0.0,
 		obj_shininess: 0,
 	});
 
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [5, 0, 4],
+		obj_v2: [(4 - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 0,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0.8, 1, 0.8],
+		obj_eta: 0.0,
+		obj_shininess: 0,
+	});
 
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
-		obj_v1: [0, 0, 0],
-		obj_v2: [1, 0, 0],
+		obj_v1: [5, -5, 4],
+		obj_v2: [(4 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [0, 0, 0],
-		obj_eta: 1.0,
+		obj_emissive: [0.8, 0.8, 1],
+		obj_eta: 0.0,
 		obj_shininess: 0,
 	});
 
-	// Cornell
+	// Objects
+	// Mirror
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [5, 5, -5],
+		obj_v2: [(8 - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 1,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: 0.0,
+		obj_shininess: 1,
+	});
 
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, 0, -2.5],
+		obj_v2: [(4 - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 3,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: 1.0,
+		obj_shininess: 1,
+	});
+
+	eta0 = 1.000293; // Air
+	eta1 = 1.33; // Water
+	eta2 = 1.52; // Glass
+	eta3 = 2.417; // Diamond
+	eta4 = 3.45; // Silicon
+	// eta4 = 10.0;
+
+	s = 2;
+	h = 1.5;
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, 5, h],
+		obj_v2: [(s - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 2,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: eta0,
+		obj_shininess: 1,
+	});
+
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, 2.5, h],
+		obj_v2: [(s - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 2,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: eta1,
+		obj_shininess: 1,
+	});
+
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, 0, h],
+		obj_v2: [(s - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 2,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: eta2,
+		obj_shininess: 1,
+	});
+
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, -2.5, h],
+		obj_v2: [(s - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 2,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: eta3,
+		obj_shininess: 1,
+	});
+
+	DefaultDatas.push({
+		obj_type: 0,
+		obj_textureType: 0,
+		obj_v1: [0, -5, h],
+		obj_v2: [(s - 50) * 2, 0, 0],
+		obj_v3: [0, 0, 0],
+		obj_bsdf_number: 2,
+		obj_albedo: [1, 1, 1],
+		obj_emissive: [0, 0, 0],
+		obj_eta: eta4,
+		obj_shininess: 1,
+	});
+
+
+
+	// Cornell
 	const size = 10;
 	const height = 5;
 
@@ -449,7 +569,7 @@ function initDefaultScene() {
 		/* axis */ glMatrix.vec3.fromValues(1, 0, 0),
 		/* angle */ 90,
 		/* obj_bsdf_number */ 0,
-		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 0.25, 0.25),
 		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
 		/* obj_eta */ 1.0,
 		/* obj_shininess */ 0
@@ -461,7 +581,7 @@ function initDefaultScene() {
 		/* axis */ glMatrix.vec3.fromValues(1, 0, 0),
 		/* angle */ 90,
 		/* obj_bsdf_number */ 0,
-		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_albedo */ glMatrix.vec3.fromValues(0.25, 1, 0.25),
 		/* obj_emissive */ glMatrix.vec3.fromValues(0, 0, 0),
 		/* obj_eta */ 1.0,
 		/* obj_shininess */ 0
@@ -485,19 +605,12 @@ function initDefaultScene() {
 function defaultScene() {
 	Datas.length = 0;
 
-	for (var i = 0; i < DefaultDatas.length; i++) {
+	for (let i = 0; i < DefaultDatas.length; i++) {
 		Datas[i] = DefaultDatas[i];
 		AddObjsAttr(i);
 	}
 
 	u_iterations = 0;
-
-
-	// var node = document.getElementById("gui2");
-	// if (node != null)
-	// 	node.parentNode.removeChild(node);
-
-	// GUIDefaultScene();
 }
 
 function resize(width, height) {

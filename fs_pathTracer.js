@@ -9,6 +9,7 @@ window.shaders.fs_pathTracer = /* glsl */ `precision lowp float;
 
 uniform highp float u_time;
 uniform int u_objnums;
+uniform int u_lights;
 
 uniform int u_iterations;
 uniform sampler2D u_texture;
@@ -26,17 +27,13 @@ uniform int u_random_mode;
 
 uniform int u_scene;
 
-const int MAX_OBJ_NUM = 30;
-const int numberOfObjects = MAX_OBJ_NUM;
+const int MAX_OBJ_NUM = 32;
 
 varying vec2 v_uv;
 
 // VARIABLES
 
 #define UP vec3(0,0,1)
-#define MAXLIGHTS 15
-#define MAXSPHERES 20
-#define MAXTRIANGLES 80
 #define PI 3.1415926536
 #define HALF_PI 1.5707963268
 #define TWO_PI 6.28318530718
@@ -101,19 +98,6 @@ struct Triangle{
 	Material material;
 };
 
-struct Scene{
-	Camera camera;
-	PointLight[MAXLIGHTS] lights;
-	Sphere[MAXSPHERES] spheres;
-	Triangle[MAXTRIANGLES] triangles;
-	int[MAXSPHERES] light_spheres;
-	int[MAXTRIANGLES] light_triangles;
-	int nbLights;
-	int nbLightSpheres;
-	int nbLightTriangles;
-	int nbSpheres;
-	int nbTriangles;
-};
 
 struct Ray{
 	vec3 origin;
@@ -286,7 +270,7 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 	float attw = u_attrtexsize.r;
 	float atth = u_attrtexsize.g;
 	int inter_selected = -1;
-	for (int i = 0; i < numberOfObjects; ++i){
+	for (int i = 0; i < MAX_OBJ_NUM; ++i){
 		if (i >= u_objnums)
 			break;
 
@@ -298,7 +282,7 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 		if (type == 0)
 		{
 			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			float radius = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r - 0.5);
+			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
 			Sphere tmp = Sphere(position, radius, radius*radius, dummy_mat);
 			if (raySphereIntersection(ray, tmp, inter, i) && inter.ptr == i)
 			{
@@ -324,9 +308,9 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 		float fiy = 0.0;
 		vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
 		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
+		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r * 10.0;
 		float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
-		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
+		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b * 3.0);
 		inter.material = Material(albedo, emissive, shininess, bsdf_number, eta);
 	}
 	return inter.hit;
@@ -370,7 +354,7 @@ float BSDF(in Material mat, in vec2 i, in vec2 o) {
 		return BSDF_lambert(i, o);
 	if(mat.bsdf_number == 1)
 		return BSDF_mirror(i, o);
-	if(mat.bsdf_number == 2)
+	if(mat.bsdf_number == 2 || mat.bsdf_number == 3)
 		return BSDF_fresnel(i, o);
 	return 0.0;
 }
@@ -527,7 +511,6 @@ vec3 sample_mirror(in Intersection inter, inout float pdf) {
 
 	if(!sameHemisphere(inter.normal, sampled))
 		sampled *= -1.0;
-	pdf = 1.0;
 	return sampled;
 }
 
@@ -771,21 +754,6 @@ void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 bet
 	ds.bsdf = BSDF(inter.material, old_dir_local_spherical, cartesianToSpherical(new_dir_local));
 }
 
-void sample_BSDF_without_world_recalibration(in Intersection inter, inout DirectionSample ds){
-	vec3 old_dir = normalize(-inter.ray.direction);
-	vec2 old_dir_spherical = cartesianToSpherical(old_dir);
-	vec3 new_dir;
-	if(inter.material.bsdf_number == 0)
-		new_dir = sample_cosine(inter, ds.pdf);
-	else if(inter.material.bsdf_number == 1)
-		new_dir = sample_mirror(inter, ds.pdf);
-	else if(inter.material.bsdf_number == 2)
-		new_dir = sample_fresnel(inter, ds.pdf);
-
-	ds.direction = new_dir;
-	ds.bsdf = BSDF(inter.material, old_dir_spherical, cartesianToSpherical(new_dir));
-}
-
 // Sampling from pbrt
 vec2 UniformSampleTriangle(in vec2 u) {
 	float su0 = sqrt(u.x);
@@ -812,14 +780,14 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	float d = length(main_direction);
 	main_direction /= d;
 	float d2 = d*d;
-	float sinthetamax = sphere.radius /d;
+	float sinthetamax = sphere.radius / d;
 
 	// float thetamax = asin(sinthetamax);
-	float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax);//cos(thetamax);
+	float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax); //cos(thetamax);
 
-	highp float costheta = 1.0 - rand1()  * (1.0 - costhetamax);
+	highp float costheta = 1.0 - rand1() * (1.0 - costhetamax);
 
-	float sintheta = sqrt(1.0 - costheta * costheta);//sin(acos(costheta))
+	float sintheta = sqrt(1.0 - costheta * costheta); //sin(acos(costheta))
 	highp float phi = rand1() * TWO_PI;
 
 	// D = 1 - d² sin² θ / r²
@@ -830,10 +798,10 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	float cosalpha = float(D_positive) * (sintheta2 / sinthetamax + costheta * sqrt(abs(D)))
 					+ float(!D_positive) * sinthetamax;
 
-	float sinalpha = sin(acos(cosalpha));//sqrt(1.0 - cosalpha * cosalpha);
+	float sinalpha = sin(acos(cosalpha)); //sqrt(1.0 - cosalpha * cosalpha);
 
 	vec3 direction = vec3(sinalpha * cos(phi), sinalpha * sin(phi), cosalpha);
-	if(abs(main_direction.z) > 0.99999){
+	if(abs(main_direction.z) > (1.0 - epsilon)){
 		sls.normal = direction * sign(main_direction.z);
 	}
 	else{
@@ -857,9 +825,7 @@ vec3 computeIllumination(in Intersection inter, in SurfaceLightSample sls, in ve
 	float cosi = abs(dot(inter.normal, pointToSample));
 	vec3 prod = bsdf * cosi * inter.material.albedo; // bounce toward light prod, called f in pbrt
 
-	if (isNan(prod[0]) || isNan(prod[1]) || isNan(prod[2])) prod = vec3(0); // Sub optimal fix
-
-	if(!isBlack(prod)) {
+	if(!isNan(prod[0]) && !isNan(prod[1]) && !isNan(prod[2]) && !isBlack(prod)) {
 		Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample, 1.0); // Better correlates with naive
 		// Ray ray_light = Ray(inter.point + inter.normal * epsilon, pointToSample, 1.0); // Ray origin is shifted along normal instead of pointToSample
 
@@ -871,21 +837,21 @@ vec3 computeIllumination(in Intersection inter, in SurfaceLightSample sls, in ve
 		}
 
 		float V = float(visibility(ray_light, sls.point));
-		vec3 Li = V * Le;
+		return V * Le * prod / pdf_light;
+	}
+	return vec3(0);
+}
 
-		vec3 color_current_light = Li * prod;
-		return color_current_light / pdf_light;
 	}
 }
 
 vec3 sampleAllLights(in Intersection inter){
 	vec3 Li_all;
-	SurfaceLightSample sls;
 
 	// Sample light spheres
 	float attw = u_attrtexsize.r;
 	float atth = u_attrtexsize.g;
-	for (int i = 0; i < numberOfObjects; ++i){
+	for (int i = 0; i < MAX_OBJ_NUM; ++i){
 		if (i >= u_objnums)
 			break;
 
@@ -894,19 +860,16 @@ vec3 sampleAllLights(in Intersection inter){
 		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
 		if (!isBlack(emissive))
 		{
+			SurfaceLightSample sls;
 			int type = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).r);
-			// const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
-			vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
-			vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-			float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
-			float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
-			int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
-			Material material = Material(albedo, emissive, shininess, bsdf_number, eta);
+
+			// Speedup as lights are not bounceable yet
+			const Material material = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
 
 			if (type == 0)
 			{
 				vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-				float radius = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r - 0.5);
+				float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
 				Sphere tmp = Sphere(position, radius, radius*radius, material);
 				sampleSphereSA(inter.point, tmp, sls); // pdf in Solid Angle
 				Li_all += computeIllumination(inter, sls, emissive, false);
@@ -921,7 +884,6 @@ vec3 sampleAllLights(in Intersection inter){
 				sampleTriangleArea(inter.point, tmp, sls); // pdf in Area converted to SA
 				Li_all += computeIllumination(inter, sls, emissive, true);
 			}
-
 		}
 	}
 
@@ -933,50 +895,34 @@ vec3 sampleOneLight(in Intersection inter){
 	vec3 Li_all;
 	SurfaceLightSample sls;
 
-	int nbLights = 0;
-
 	float attw = u_attrtexsize.r;
 	float atth = u_attrtexsize.g;
 
-	// Count
-	for (int i = 0; i < numberOfObjects; ++i){
+	// Select
+	int selected = int(rand1() * float(u_lights));
+
+	// Find
+	int cnt = 0; // Counter for selecting ith light
+	for (int i = 0; i < MAX_OBJ_NUM; ++i){
 		if (i >= u_objnums)
 			break;
-
 		float fix = float(i);
 		float fiy = 0.0;
 		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-		if (!isBlack(emissive))
-		{
-			nbLights++;
-		}
-	}
 
-	// Select
-	int selected = int(rand1() * float(nbLights));
-
-	// Find
-	for (int i = 0; i < numberOfObjects; ++i){
-		if (i >= u_objnums)
-			break;
-		if (i != selected)
+		if (isBlack(emissive))
 			continue;
-		float fix = float(i);
-		float fiy = 0.0;
+		else if(cnt++ != selected)
+			continue;
 
 		int type = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).r);
 
-		vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
-		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
-		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r;
-		float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
-		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b);
-		Material material = Material(albedo, emissive, shininess, bsdf_number, eta);
+		const Material material = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
 
 		if (type == 0)
 		{
 			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			float radius = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r - 0.5);
+			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
 			Sphere tmp = Sphere(position, radius, radius*radius, material);
 			sampleSphereSA(inter.point, tmp, sls); // pdf in Solid Angle
 			return computeIllumination(inter, sls, emissive, false);
@@ -1067,7 +1013,7 @@ vec3 tracePath(in Ray ray, bool naive, bool lastLight) {
 		for(int depth = 0; depth < MAX_DEPTH; ++depth) {
 			inter = inter_dummy(ray); // needed to init hit to false
 			if(raySceneIntersection(ray, inter)) {
-				spec_current = inter.material.bsdf_number == 1 || inter.material.bsdf_number == 2;
+				spec_current = inter.material.bsdf_number == 1 || inter.material.bsdf_number == 2 || inter.material.bsdf_number == 3;
 				// Emissive material
 				if(isEmissive(inter.material)) {
 					if(depth == 0 || naive || spec_last) {
