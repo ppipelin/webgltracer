@@ -275,7 +275,7 @@ function AddObjsAttr(i) {
 }
 
 function addSphere() {
-	if (Datas.length == 31)
+	if (Datas.length == 63)
 		return;
 	Datas.push({
 		obj_type: 0,
@@ -296,7 +296,7 @@ function addSphere() {
 }
 
 function addTriangle() {
-	if (Datas.length == 31)
+	if (Datas.length == 63)
 		return;
 	Datas.push({
 		obj_type: 1,
@@ -400,7 +400,7 @@ function initDefaultScene() {
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
 		obj_emissive: [1, 0.8, 0.8],
-		obj_eta: 0.0,
+		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
 
@@ -413,7 +413,7 @@ function initDefaultScene() {
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
 		obj_emissive: [0.8, 1, 0.8],
-		obj_eta: 0.0,
+		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
 
@@ -426,7 +426,7 @@ function initDefaultScene() {
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
 		obj_emissive: [0.8, 0.8, 1],
-		obj_eta: 0.0,
+		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
 
@@ -439,19 +439,6 @@ function initDefaultScene() {
 		obj_v2: [(8 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 1,
-		obj_albedo: [1, 1, 1],
-		obj_emissive: [0, 0, 0],
-		obj_eta: 0.0,
-		obj_shininess: 1,
-	});
-
-	DefaultDatas.push({
-		obj_type: 0,
-		obj_textureType: 0,
-		obj_v1: [0, 0, -2.5],
-		obj_v2: [(4 - 50) * 2, 0, 0],
-		obj_v3: [0, 0, 0],
-		obj_bsdf_number: 3,
 		obj_albedo: [1, 1, 1],
 		obj_emissive: [0, 0, 0],
 		obj_eta: 1.0,

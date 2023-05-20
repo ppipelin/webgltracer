@@ -27,7 +27,7 @@ uniform int u_random_mode;
 
 uniform int u_scene;
 
-const int MAX_OBJ_NUM = 32;
+const int MAX_OBJ_NUM = 64;
 
 varying vec2 v_uv;
 
@@ -49,7 +49,7 @@ const float translation_speed = 10.0;
 const float rotation_speed = 0.1;
 
 // Rendering parameters
-#define MAX_DEPTH 16
+#define MAX_DEPTH 8
 #define SPPPF 2
 // const float epsilon = 0.005; // OLD
 const float epsilon = 0.0001;
@@ -675,75 +675,17 @@ void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 bet
 	else if(inter.material.bsdf_number == 1)
 		new_dir_local = sample_mirror(inter, ds.pdf);
 	else if(inter.material.bsdf_number == 2)
+		new_dir_local = sample_fresnel(inter, ds.pdf);
+	else if(inter.material.bsdf_number == 3)
 	{
 		// Spectral dispersion
-		if(true)
-		{
-			float picked_rnd = rand1();
-			float wvl_selection = picked_rnd * (750.0-350.0) + 350.0;
-			//int wvl_selection = int(floor(rand1() * 3.0));
+		float picked_rnd = rand1();
+		float wvl_selection = picked_rnd * (750.0-350.0) + 350.0;
 
-			if (inter.material.eta == 1.52 || inter.ray.eta == 1.52)
-			{
-				// GLASS
-				float new_eta = 1.52;
-				float old_eta = inter.material.eta;
+		beta_modifier = wvl_to_rgb(wvl_selection);
 
-
-				// if (wvl_selection == 0)
-				// {
-				// 	new_eta = 1.5145; // 650nm
-				// 	//new_eta = 1.01; // 650nm
-				// 	beta_modifier = vec3(1, 0, 0);
-				// }
-				// if (wvl_selection == 1)
-				// {
-				// 	new_eta = 1.5208; // 510nm
-				// 	//new_eta = 50.0; // 510nm
-				// 	beta_modifier = vec3(0, 1, 0);
-				// }
-				// if (wvl_selection == 2)
-				// {
-				// 	new_eta = 1.5228; // 480nm
-				// 	//new_eta = 100.0; // 480nm
-				// 	beta_modifier = vec3(0, 0, 1);
-				// }
-				//
-				// beta_modifier = beta_modifier*3.0;
-
-				// if (wvl_selection <= 483.333)
-				// {
-				// 	beta_modifier = vec3(1, 0, 0);
-				// }
-				// if (wvl_selection > 483.333 && wvl_selection < 666.666)
-				// {
-				// 	beta_modifier = vec3(0, 1, 0);
-				// }
-				// if (wvl_selection >= 666.666)
-				// {
-				// 	beta_modifier = vec3(0, 0, 1);
-				// }
-
-				beta_modifier = wvl_to_rgb(wvl_selection);
-
-				// new_eta = picked_rnd * 0.5 + 1.0;
-				//new_eta = picked_rnd * (1.5228 - 1.5145) + 1.5145;
-				new_eta = picked_rnd * (3.4 - 1.5) + 1.5;
-				// beta_modifier = beta_modifier*(750.0-350.0);
-
-				// new_eta = picked_rnd * (4.0 - 1.5) + 1.5;
-				// new_eta = picked_rnd * (old_eta * 2.0 - old_eta - 0.5) + old_eta - 0.5;
-
-				if (inter.material.eta == 1.52)
-				{
-					inter.material.eta = new_eta;
-				}
-				else
-				{
-					inter.ray.eta = new_eta;
-				}
-			}
-		}
+		float new_eta = picked_rnd * (3.4 - 1.5) + 1.5;
+		inter.material.eta = new_eta;
 		new_dir_local = sample_fresnel(inter, ds.pdf);
 	}
 
@@ -981,7 +923,7 @@ vec3 traceRay(in Ray ray, bool shadow) {
 				}
 				else
 				{
-					color_total += sampleAllLights(inter);
+					color_total += sampleOneLight(inter);
 				}
 			}
 
@@ -1021,14 +963,9 @@ vec3 tracePath(in Ray ray, bool naive, bool lastLight) {
 					} else if(lastLight && depth < MAX_DEPTH-1) {
 						color_total += beta * inter.material.emissive;
 					}
-				} else if(!spec_current) {
-					// Light sampling
-					if(!naive) { // Iterative PT
-						// color_total += beta * sampleAllLights(inter);
-						if(!lastLight || lastLight && depth == MAX_DEPTH-1) {
-							color_total += beta * sampleOneLight(inter);
-						}
-					}
+				} else if(!spec_current && !naive && (!lastLight || lastLight && depth == MAX_DEPTH-1)) {
+					// color_total += beta * sampleAllLights(inter);
+					color_total += beta * sampleOneLight(inter);
 				}
 
 				// Surface sampling for next bounce
@@ -1060,8 +997,6 @@ vec3 tracePath(in Ray ray, bool naive, bool lastLight) {
 	return res;
 }
 
-// Scene scene;
-
 void main() {
 	vec3 delta_p = vec3(0,0,0);
 	delta_p.x += u_keyboard.x;
@@ -1072,13 +1007,6 @@ void main() {
 	delta_r.y += u_mouse.y * rotation_speed;
 	vec2 uv_swap = v_uv;
 	uv_swap.x = -v_uv.x + 1.0;
-
-	// initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	// initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r, false);
-	//if(u_scene == 0)
-	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	//else
-	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
 
 	// Initialize from attr
 	vec3 position = vec3(-15, -0.35, 0);
