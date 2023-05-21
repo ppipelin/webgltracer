@@ -329,8 +329,36 @@ function rotationMatrix(axis, angle) {
 		oc * axis[2] * axis[0] - axis[1] * s, oc * axis[1] * axis[2] + axis[0] * s, oc * axis[2] * axis[2] + c);
 }
 
-function addQuad(datas, position, scale = glMatrix.vec2.fromValues(1, 1), axis = glMatrix.vec3.fromValues(0, 0, 1), angle = 0, obj_bsdf_number = 0, obj_albedo = glMatrix.vec3.fromValues(1, 1, 1), obj_emissive = glMatrix.vec3.fromValues(0, 0, 0), obj_eta = 1.5, obj_shininess = 0) {
-	if (datas.length == 31)
+function addCube(datas, position, scale = 1, axis = glMatrix.vec3.fromValues(0, 0, 1), angle = 0, obj_bsdf_number = 0, obj_albedo = glMatrix.vec3.fromValues(1, 1, 1), obj_emissive = glMatrix.vec3.fromValues(0, 0, 0), obj_eta = 1.0, obj_shininess = 0) {
+	if (datas.length == 63)
+		return;
+
+	shift = glMatrix.vec3.create();
+
+	// Left
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(0, scale / 2, 0), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(1, 0, 0), 90, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+	// Right
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(0, -scale / 2, 0), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(1, 0, 0), 90, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+	// Top
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(0, 0, -scale / 2), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(1, 0, 0), 0, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+	// Bottom
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(0, 0, scale / 2), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(1, 0, 0), 0, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+	// Back
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(scale / 2, 0, 0), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(0, 1, 0), 90, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+	// Front
+	glMatrix.vec3.add(shift, glMatrix.vec3.fromValues(-scale / 2, 0, 0), position);
+	addQuad(datas, shift, glMatrix.vec2.fromValues(scale, scale), glMatrix.vec3.fromValues(0, 1, 0), 90, obj_bsdf_number, obj_albedo, obj_emissive, obj_eta, obj_shininess);
+
+	u_iterations = 0;
+}
+
+function addQuad(datas, position, scale = glMatrix.vec2.fromValues(1, 1), axis = glMatrix.vec3.fromValues(0, 0, 1), angle = 0, obj_bsdf_number = 0, obj_albedo = glMatrix.vec3.fromValues(1, 1, 1), obj_emissive = glMatrix.vec3.fromValues(0, 0, 0), obj_eta = 1.0, obj_shininess = 0) {
+	if (datas.length == 63)
 		return;
 
 	R = rotationMatrix(axis, angle);
@@ -394,12 +422,12 @@ function initDefaultScene() {
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
-		obj_v1: [5, 5, 4],
-		obj_v2: [(4 - 50) * 2, 0, 0],
+		obj_v1: [-2, 5, 5],
+		obj_v2: [(3 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [1, 0.8, 0.8],
+		obj_emissive: [1.0, 0.6, 0.6],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
@@ -407,12 +435,12 @@ function initDefaultScene() {
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
-		obj_v1: [5, 0, 4],
-		obj_v2: [(4 - 50) * 2, 0, 0],
+		obj_v1: [-2, 0, 5],
+		obj_v2: [(3 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [0.8, 1, 0.8],
+		obj_emissive: [0.6, 1.0, 0.6],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
@@ -420,15 +448,27 @@ function initDefaultScene() {
 	DefaultDatas.push({
 		obj_type: 0,
 		obj_textureType: 0,
-		obj_v1: [5, -5, 4],
-		obj_v2: [(4 - 50) * 2, 0, 0],
+		obj_v1: [-2, -5, 5],
+		obj_v2: [(3 - 50) * 2, 0, 0],
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [0.8, 0.8, 1],
+		obj_emissive: [0.6, 0.6, 1.0],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
+
+	addQuad(DefaultDatas,
+		glMatrix.vec3.fromValues(-1.5, -1, -3),
+		glMatrix.vec2.fromValues(3, 3),
+		glMatrix.vec3.fromValues(0, 1, 1),
+		70,
+		0,
+		glMatrix.vec3.fromValues(1, 1, 1),
+		glMatrix.vec3.fromValues(1, 1, 1),
+		1.0,
+		0.0
+	);
 
 	// Objects
 	// Mirror
@@ -444,6 +484,18 @@ function initDefaultScene() {
 		obj_eta: 1.0,
 		obj_shininess: 1,
 	});
+
+	addCube(DefaultDatas,
+		glMatrix.vec3.fromValues(0, 0, -2.5),
+		3,
+		glMatrix.vec3.fromValues(0, 0, 1),
+		0,
+		3,
+		glMatrix.vec3.fromValues(1, 1, 1),
+		glMatrix.vec3.fromValues(0, 0, 0),
+		1.0,
+		0.0
+	);
 
 	eta0 = 1.000293; // Air
 	eta1 = 1.33; // Water
