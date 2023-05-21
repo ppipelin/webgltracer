@@ -27,7 +27,7 @@ uniform int u_random_mode;
 
 uniform int u_scene;
 
-const int MAX_OBJ_NUM = 64;
+const int MAX_OBJ_NUM = 256;
 
 varying vec2 v_uv;
 
@@ -281,8 +281,8 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
 		if (type == 0)
 		{
-			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
+			vec3 position = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			float radius = 5.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
 			Sphere tmp = Sphere(position, radius, radius*radius, dummy_mat);
 			if (raySphereIntersection(ray, tmp, inter, i) && inter.ptr == i)
 			{
@@ -291,9 +291,9 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 		}
 		else if (type == 1)
 		{
-			vec3 v1 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			vec3 v2 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
-			vec3 v3 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v1 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v2 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v3 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
 			Triangle tmp = Triangle(v1, v2, v3, dummy_mat);
 			if (rayTriangleIntersection(ray, tmp, inter, i) && inter.ptr == i)
 			{
@@ -700,17 +700,17 @@ vec3 sampleOneLight(in Intersection inter){
 
 		if (type == 0)
 		{
-			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
+			vec3 position = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			float radius = 5.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
 			Sphere tmp = Sphere(position, radius, radius*radius, material);
 			sampleSphereSA(inter.point, tmp, sls); // pdf in Solid Angle
 			return float(u_lights) * estimateDirect(inter, sls, emissive, false);
 		}
 		else if (type == 1)
 		{
-			vec3 v1 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
-			vec3 v2 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
-			vec3 v3 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v1 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v2 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v3 = 20.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
 			Triangle tmp = Triangle(v1, v2, v3, material);
 
 			sampleTriangleArea(inter.point, tmp, sls); // pdf in Area converted to SA
