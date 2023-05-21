@@ -8,14 +8,18 @@ window.shaders.fs_pathTracer = /* glsl */ `precision lowp float;
 #endif
 
 uniform highp float u_time;
+uniform int u_objnums;
+uniform int u_lights;
 
 uniform int u_iterations;
 uniform sampler2D u_texture;
+uniform sampler2D u_attrtexture;
 
 uniform vec2 u_mouse;
 uniform vec3 u_keyboard;
 
 uniform vec2 u_texsize;
+uniform vec2 u_attrtexsize;
 
 uniform int u_render_mode;
 
@@ -23,14 +27,13 @@ uniform int u_random_mode;
 
 uniform int u_scene;
 
+const int MAX_OBJ_NUM = 64;
+
 varying vec2 v_uv;
 
 // VARIABLES
 
 #define UP vec3(0,0,1)
-#define MAXLIGHTS 15
-#define MAXSPHERES 20
-#define MAXTRIANGLES 80
 #define PI 3.1415926536
 #define HALF_PI 1.5707963268
 #define TWO_PI 6.28318530718
@@ -42,17 +45,14 @@ varying vec2 v_uv;
 highp float seed;
 
 // Scene/inputs parameters
-const float scene_scale = 1.0;
-const float translation_speed = 10.0 * scene_scale;
+const float translation_speed = 10.0;
 const float rotation_speed = 0.1;
-const vec4 INITIAL_POS_SPP = scene_scale * vec4(-40.0,0.0,-10.0,1.0);
-const vec4 INITIAL_ROT_TECH = vec4(HALF_PI + 0.1,0,0,0);
 
 // Rendering parameters
-#define MAX_DEPTH 16
+#define MAX_DEPTH 8
 #define SPPPF 2
-// const float epsilon = scene_scale * 0.005; // OLD
-const float epsilon = scene_scale * 0.0001;
+// const float epsilon = 0.005; // OLD
+const float epsilon = 0.0001;
 
 // END_VARIABLES
 
@@ -80,7 +80,7 @@ struct Material{
 	vec3 albedo; // Loss of energy or not
 	vec3 emissive;
 	float shininess;
-	int bsdf_number; // 0 is lambert, 1 is mirror, 2 is optical polished
+	int bsdf_number; // 0 is lambert, 1 is mirror, 2 is optical polished, 3 is diffractive
 	float eta;
 };
 
@@ -98,19 +98,6 @@ struct Triangle{
 	Material material;
 };
 
-struct Scene{
-	Camera camera;
-	PointLight[MAXLIGHTS] lights;
-	Sphere[MAXSPHERES] spheres;
-	Triangle[MAXTRIANGLES] triangles;
-	int[MAXSPHERES] light_spheres;
-	int[MAXTRIANGLES] light_triangles;
-	int nbLights;
-	int nbLightSpheres;
-	int nbLightTriangles;
-	int nbSpheres;
-	int nbTriangles;
-};
 
 struct Ray{
 	vec3 origin;
@@ -137,8 +124,7 @@ struct Intersection{
 	vec3 normal;
 	Ray ray;
 	Material material;
-	int tptr;
-	int sptr;
+	int ptr;
 };
 // END_STRUCTURES
 
@@ -224,22 +210,22 @@ Ray makeRay(vec2 uv, in Camera camera) {
 
 Intersection inter_dummy(in Ray ray) {
 	const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
-	return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
+	return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0);
 }
 
-Intersection inter_succeeded(vec3 point, float t, vec3 normal, in Ray ray, in Material material, int tptr, int sptr){
+Intersection inter_succeeded(vec3 point, float t, vec3 normal, in Ray ray, in Material material, int ptr){
 	bool ok = dot(ray.direction, normal) <= 0.0;
 	normal *= (1.0 * float(ok) - 1.0 * float(!ok));
 	// Assert not to close to 90 degrees
 	if (dot(ray.direction, normal) > -epsilon)
 	{
 		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
-		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0, 0);
+		return Intersection(false, vec3(0), 0.0, vec3(0), ray, dummy_mat, 0);
 	}
-	return Intersection(true, point, t, normal, ray, material, tptr, sptr);
+	return Intersection(true, point, t, normal, ray, material, ptr);
 }
 
-bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection currentInter, int sptr){
+bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection currentInter, int ptr){
 	vec3 oc = ray.origin - sphere.position;
 	float b = dot( oc, ray.direction );
 	float c = dot( oc, oc ) - sphere.radius2;
@@ -254,15 +240,15 @@ bool raySphereIntersection(in Ray ray, in Sphere sphere, inout Intersection curr
 		if(t2 > 0.0) t = min(t1,t2);
 		else t = t1;
 	} else t = t2;
-	if(t > currentInter.t && currentInter.hit) return true;
+	if(currentInter.hit && t > currentInter.t) return true;
 	vec3 point = ray.origin + t * ray.direction;
 	vec3 normal = (point - sphere.position) / sphere.radius;
-	currentInter = inter_succeeded(point, t, normal, ray, sphere.material, -1, sptr);
+	currentInter = inter_succeeded(point, t, normal, ray, sphere.material, ptr);
 	return true;
 }
 
 // triangle designed by vertices v0, v1 and v2
-bool rayTriangleIntersection(in Ray ray,  in Triangle tri, inout Intersection currentInter, int tptr)
+bool rayTriangleIntersection(in Ray ray, in Triangle tri, inout Intersection currentInter, int ptr)
 {
 	vec3 v1v0 = tri.v1 - tri.v0;
 	vec3 v2v0 = tri.v2 - tri.v0;
@@ -274,33 +260,71 @@ bool rayTriangleIntersection(in Ray ray,  in Triangle tri, inout Intersection cu
 	float v = d*dot(  q, v1v0 );
 	float t = d*dot( -n, rov0 );
 	if(u < 0.0 || u > 1.0 || v < 0.0 || (u + v) > 1.0 || t <= 0.0) return false;
-	if(t > currentInter.t && currentInter.hit) return true;
+	if(currentInter.hit && t > currentInter.t) return true;
 	vec3 point = ray.origin + ray.direction * t;
-	currentInter = inter_succeeded(point, t, normalize(n), ray, tri.material, tptr, -1);
+	currentInter = inter_succeeded(point, t, normalize(n), ray, tri.material, ptr);
 	return true;
 }
 
-bool raySceneIntersection(in Ray ray, in Scene scene, inout Intersection inter){
-	for(int i = 0 ; i < MAXSPHERES ; ++i){
-		if(i < scene.nbSpheres)
-			raySphereIntersection(ray, scene.spheres[i], inter, i);
+bool raySceneIntersection(in Ray ray, inout Intersection inter){
+	float attw = u_attrtexsize.r;
+	float atth = u_attrtexsize.g;
+	int inter_selected = -1;
+	for (int i = 0; i < MAX_OBJ_NUM; ++i){
+		if (i >= u_objnums)
+			break;
+
+		float fix = float(i);
+		float fiy = 0.0;
+		int type = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).r);
+
+		const Material dummy_mat = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
+		if (type == 0)
+		{
+			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
+			Sphere tmp = Sphere(position, radius, radius*radius, dummy_mat);
+			if (raySphereIntersection(ray, tmp, inter, i) && inter.ptr == i)
+			{
+				inter_selected = i;
+			}
+		}
+		else if (type == 1)
+		{
+			vec3 v1 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v2 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v3 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
+			Triangle tmp = Triangle(v1, v2, v3, dummy_mat);
+			if (rayTriangleIntersection(ray, tmp, inter, i) && inter.ptr == i)
+			{
+				inter_selected = i;
+			}
+		}
 	}
-	for(int i = 0 ; i < MAXTRIANGLES ; ++i){
-		if(i < scene.nbTriangles)
-			rayTriangleIntersection(ray, scene.triangles[i], inter, i);
+	// Compute material from texture once we found the closest intersecting
+	if (inter_selected != -1)
+	{
+		float fix = float(inter_selected);
+		float fiy = 0.0;
+		vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
+		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
+		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r * 10.0;
+		float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
+		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b * 3.0);
+		inter.material = Material(albedo, emissive, shininess, bsdf_number, eta);
 	}
 	return inter.hit;
 }
 
-bool visibility(in Ray ray, in Scene scene, vec3 point){
+bool visibility(in Ray ray, vec3 point){
 	Intersection inter = inter_dummy(ray);
-	raySceneIntersection(ray, scene, inter);
+	raySceneIntersection(ray, inter);
 	return inter.hit && samePoint(inter.point, point);
 }
 
 // FUNCTIONS MATERIALS
-bool isEmissive(in Material mat){
-	return mat.emissive.r > 0.0 || mat.emissive.g > 0.0 || mat.emissive.b > 0.0;
+bool isEmissive(const in Material mat){
+	return mat.emissive.r > epsilon || mat.emissive.g > epsilon || mat.emissive.b > epsilon;
 }
 
 bool isColor(vec3 c) {
@@ -330,261 +354,9 @@ float BSDF(in Material mat, in vec2 i, in vec2 o) {
 		return BSDF_lambert(i, o);
 	if(mat.bsdf_number == 1)
 		return BSDF_mirror(i, o);
-	if(mat.bsdf_number == 2)
+	if(mat.bsdf_number == 2 || mat.bsdf_number == 3)
 		return BSDF_fresnel(i, o);
 	return 0.0;
-}
-
-// FUNCTIONS SCENE
-void addQuad(vec3 position, vec2 scale, vec3 axis, float angle, in Material material, inout Scene scene){
-	if (scene.nbTriangles + 2 > MAXTRIANGLES)
-	{
-		return;
-	}
-
-	mat3 R = rotationMatrix(axis, angle);
-	vec3 fl = R * vec3(-0.5*scale.x, -0.5*scale.y, 0) + position;
-	vec3 fr = R * vec3(-0.5*scale.x, 0.5*scale.y, 0) + position;
-	vec3 bl = R * vec3(0.5*scale.x, -0.5*scale.y, 0) + position;
-	vec3 br = R * vec3(0.5*scale.x, 0.5*scale.y, 0) + position;
-
-	// for (int k = scene.nbTriangles; k < scene.nbTriangles + 2; ++k) // Does not work cause bounds are not const
-	// 	scene.triangles[k] = Triangle(fl, fr, br, material); // k is a constant
-	for (int k = 0; k < MAXTRIANGLES; ++k)
-		if(k == scene.nbTriangles)
-			scene.triangles[k] = Triangle(fl, fr, br, material); // k is a constant
-		else if(k == scene.nbTriangles+1)
-			scene.triangles[k] = Triangle(br, bl, fl, material);
-
-	scene.nbTriangles += 2;
-
-	if(isEmissive(material) && scene.nbLightTriangles + 1 <= MAXLIGHTS){
-		for (int k = 0; k < MAXLIGHTS; ++k){
-			if(k == scene.nbLightTriangles)
-				scene.light_triangles[k] = scene.nbTriangles-2; // k is a constant
-			if(k == scene.nbLightTriangles+1)
-				scene.light_triangles[k] = scene.nbTriangles-1; // k is a constant
-		}
-		scene.nbLightTriangles += 2;
-		scene.nbLights += 2;
-	}
-}
-
-void addSphere(vec3 position, float radius, Material material, inout Scene scene){
-	if (scene.nbSpheres + 1 > MAXSPHERES)
-	{
-		return;
-	}
-	for (int k = 0; k < MAXSPHERES; ++k)
-		if(k == scene.nbSpheres)
-			scene.spheres[k] = Sphere(position, radius, radius*radius, material); // k is a constant
-	
-	scene.nbSpheres++;
-
-	if(isEmissive(material) && scene.nbLightSpheres + 1 <= MAXLIGHTS){
-		for (int k = 0; k < MAXLIGHTS; ++k)
-			if(k == scene.nbLightSpheres)
-				scene.light_spheres[k] = scene.nbSpheres-1;
-		scene.nbLightSpheres++;
-		scene.nbLights++;
-	}
-}
-
-void addCornell(vec3 position, float scale, in Material mground, in Material mfront, in Material mleft, in Material mright,in Material mup, inout Scene scene) {
-	// ground
-	addQuad(position + scale * vec3(0.0,0,-0.5), scale * vec2(1.0), vec3(0,1,0), 0.0, mground, scene);
-	// front
-	addQuad(position + scale * vec3(0.5,0,0), scale * vec2(1.0), vec3(0,1,0), HALF_PI, mfront, scene);
-	// left
-	addQuad(position + scale * vec3(0,0.5,0), scale * vec2(1.0), vec3(1,0,0), HALF_PI, mleft, scene);
-	// right
-	addQuad(position + scale * vec3(0,-0.5,0), scale * vec2(1.0), vec3(1,0,0), -HALF_PI, mright, scene);
-	// up
-	addQuad(position + scale * vec3(0,0,0.5), scale * vec2(1.0), vec3(0,1,0), 0.0, mup, scene);
-}
-
-void addCornell(vec3 position, float scale, in Material mat, inout Scene scene) {
-	addCornell(position, scale, mat, mat, mat, mat, mat, scene);
-}
-
-void addCube(vec3 position, float scale, in Material mat, inout Scene scene){
-	addQuad(position + scale * vec3(0.0,0,-0.5), scale * vec2(1.0), vec3(0,1,0), 0.0, mat, scene);
-	addQuad(position + scale * vec3(0.5,0,0), scale * vec2(1.0), vec3(0,1,0), HALF_PI, mat, scene);
-	addQuad(position + scale * vec3(0,0.5,0), scale * vec2(1.0), vec3(1,0,0), HALF_PI, mat, scene);
-	addQuad(position + scale * vec3(0,-0.5,0), scale * vec2(1.0), vec3(1,0,0), -HALF_PI, mat, scene);
-	addQuad(position + scale * vec3(0,0,0.5), scale * vec2(1.0), vec3(0,1,0), 0.0, mat, scene);
-	addQuad(position + scale * vec3(-0.5,0,0), scale * vec2(1.0), vec3(0,1,0), HALF_PI, mat, scene);
-}
-
-void addTetrahedron(vec3 position, vec3 scale, vec3 axis, float angle, in Material material, inout Scene scene){
-	if (scene.nbTriangles + 4 > MAXTRIANGLES)
-	{
-		return;
-	}
-	mat3 R = rotationMatrix(axis, angle);
-	vec3 a = R * vec3(0) + position;
-	vec3 b = R * vec3(0, scale.y, 0) + position;
-	vec3 c = R * vec3(scale.x, 0, 0) + position;
-	vec3 top = R * vec3(0, 0, scale.z) + position;
-
-	for (int k = 0; k < MAXTRIANGLES; ++k)
-		if(k == scene.nbTriangles)
-			scene.triangles[k] = Triangle(a, b, c, material);
-		else if(k == scene.nbTriangles+1)
-			scene.triangles[k] = Triangle(a, b, top, material);
-		else if(k == scene.nbTriangles+2)
-			scene.triangles[k] = Triangle(a, c, top, material);
-		else if(k == scene.nbTriangles+3)
-			scene.triangles[k] = Triangle(b, c, top, material);
-
-	if (isEmissive(material) && scene.nbLightTriangles + 4 <= MAXLIGHTS)
-	{
-		for (int k = 0; k < MAXLIGHTS; ++k)
-			if(k == scene.nbTriangles)
-				scene.light_triangles[k] = scene.nbTriangles;
-			else if(k == scene.nbTriangles+1)
-				scene.light_triangles[k] = scene.nbTriangles+1;
-			else if(k == scene.nbTriangles+2)
-				scene.light_triangles[k] = scene.nbTriangles+2;
-			else if(k == scene.nbTriangles+3)
-				scene.light_triangles[k] = scene.nbTriangles+3;
-
-		scene.nbLightTriangles += 4;
-		scene.nbLights += 4;
-	}
-	scene.nbTriangles += 4;
-}
-
-void initSceneCornell(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r){
-	// Camera
-	rotation += delta_r;
-	vec3 front = sphericalToCartesian(rotation);
-	vec3 right = normalize(cross(UP, front));
-
-	position += front * delta_p.x;
-	position += right * delta_p.y;
-	position.z += delta_p.z;
-
-	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
-	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
-
-	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
-	Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0);
-	Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0);
-
-	// Cornell
-	vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
-	addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
-	float factor = 0.3;
-
-	// Lights
-	//Material mlight1 = Material(vec3(0), vec3(0, 0.25, 1) / factor, 0.0, 0, 0.0);
-	Material mlight1 = Material(vec3(0), vec3(10) / factor, 0.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(0, 0, 2), scene_scale * factor, mlight1, scene); // BLUE
-
-	//Material mlight2 = Material(vec3(0), vec3(1, 1, 0) / factor, 0.0, 0, 0.0);
-	Material mlight2 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
-	//addSphere(center + scene_scale * vec3(-1, -1.5, -1.75), scene_scale * 2.0 * factor, mlight2, scene); // YELLOW
-
-	//Material mlight3 = Material(vec3(0), vec3(1, 0, 0.25) / factor, 0.0, 0, 0.0);
-	Material mlight3 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
-	//addSphere(center + scene_scale * vec3(0, 0, 0), scene_scale * 2.0 * factor, mlight3, scene); // PINK
-
-	//Material mlight4 = Material(vec3(0), vec3(0, 0.97, 0.1) / factor, 0.0, 0, 0.0);
-	Material mlight4 = Material(vec3(0), vec3(1) / factor, 0.0, 0, 0.0);
-	//addCube(center + scene_scale * vec3(2, -2, 0), scene_scale * 1.5 * factor, mlight4, scene); // GREEN
-
-	// Cubes
-	addCube(center + scene_scale * vec3(-1,1.5,-1.5), scene_scale, Material(vec3(1), vec3(0), 0.0, 2, 1.52), scene); // Adds fresnel cube
-
-	// Spheres
-	Material msdiffp = Material(vec3(1), vec3(0), 0.0, 2, 1.52);
-	addSphere(center + scene_scale * vec3(1,-1,-1), scene_scale * factor * 3.0, msdiffp, scene);
-
-	Material msdiffy = Material(vec3(1,1,0), vec3(0), 0.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(1,-3,2), scene_scale * factor * 7.0, msdiffy, scene);
-
-	Material msgloss1 = Material(vec3(0.3,0.9,0.9), vec3(0), 10.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(1,2,-1), scene_scale * factor * 5.0, msgloss1, scene);
-
-	Material msspec1 = Material(vec3(1.0,0.5,0.3), vec3(0), 1000.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(0,0,-8), scene_scale * factor * 20.0, msspec1, scene);
-
-	Material msspec2 = Material(vec3(1.0,1.0,1.0), vec3(0), 50000.0, 1, 0.0);
-	addSphere(center + scene_scale * vec3(5,5,5), scene_scale * factor * 20.0, msspec2, scene);
-
-	Material msgloss2 = Material(vec3(1.0,0.0,0.7), vec3(0), 1.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 3.0, msgloss2, scene);
-}
-
-void initSceneRefract(inout Scene scene, inout vec3 position, vec3 delta_p, inout vec2 rotation, vec2 delta_r, bool all_white){
-	// Camera
-	rotation += delta_r;
-	vec3 front = sphericalToCartesian(rotation);
-	vec3 right = normalize(cross(UP, front));
-
-	position += front * delta_p.x;
-	position += right * delta_p.y;
-	position.z += delta_p.z;
-
-	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
-	scene.camera = makeCameraFromFrontRight(position, front, right, cplane);
-
-	Material diffuse_white = Material(vec3(1), vec3(0), 0.0, 0, 0.0);
-	Material diffuse_red = Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0);
-	Material diffuse_green = Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0);
-
-	if(all_white)
-	{
-		diffuse_red = diffuse_white;
-		diffuse_green = diffuse_white;
-	}
-
-	// Cornell
-	vec3 center = INITIAL_POS_SPP.xyz + scene_scale * vec3(20,0,-1.8);
-	addCornell(center, scene_scale * 5.0, diffuse_white, diffuse_white, diffuse_red, diffuse_green, diffuse_white, scene);
-	float factor = 0.3;
-
-	// Lights
-	Material mlight1 = Material(vec3(0), vec3(1) / factor * 1.0, 0.0, 0, 0.0);
-	// Material mlight1 = Material(vec3(0), vec3(100) / factor, 0.0, 0, 0.0);
-	addSphere(center + scene_scale * vec3(0,0,3), scene_scale * factor * 5.0, mlight1, scene); // WHITE
-	// addQuad(center + scene_scale * vec3(0,0,2), scene_scale * factor * vec2(1.0) * 10.0, vec3(0,1,0), 0.0, mlight1, scene); // WHITE
-
-	float eta0 = 1.000293; // Air
-	float eta1 = 1.33; // Water
-	float eta2 = 1.52; // Glass
-	float eta3 = 2.417; // Diamond
-	float eta4 = 3.45; // Silicon
-	// Objects
-	if (!all_white)
-	{
-		addSphere(center + scene_scale * vec3(2,2,0.5), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,1,0.5), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,0.5), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-1,0.5), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-2,0.5), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
-
-		addSphere(center + scene_scale * vec3(2,2,-2), scene_scale * factor * 1.5, Material(vec3(1,0,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,1,-2), scene_scale * factor * 1.5, Material(vec3(0.75,0.25,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,0,-2), scene_scale * factor * 1.5, Material(vec3(0.5,0.5,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-1,-2), scene_scale * factor * 1.5, Material(vec3(0.25,0.75,0), vec3(0), 0.0, 0, 0.0), scene);
-		addSphere(center + scene_scale * vec3(2,-2,-2), scene_scale * factor * 1.5, Material(vec3(0,1,0), vec3(0), 0.0, 0, 0.0), scene);
-	}
-
-	addSphere(center + scene_scale * vec3(0,2,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta0), scene);
-	addSphere(center + scene_scale * vec3(0,1,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta1), scene);
-	addSphere(center + scene_scale * vec3(0,0,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
-	addSphere(center + scene_scale * vec3(0,-1,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta3), scene);
-	addSphere(center + scene_scale * vec3(0,-2,0), scene_scale * factor * 1.5, Material(vec3(1), vec3(0), 0.0, 2, eta4), scene);
-
-	addCube(center + scene_scale * vec3(0,2,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta0), scene);
-	addCube(center + scene_scale * vec3(0,1,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta1), scene);
-	addCube(center + scene_scale * vec3(0,0,-2), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
-	addCube(center + scene_scale * vec3(0,-1,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta3), scene);
-	addCube(center + scene_scale * vec3(0,-2,-1), scene_scale * 0.75, Material(vec3(1), vec3(0), 0.0, 2, eta4), scene);
-
-	addTetrahedron(center + scene_scale * vec3(0,0,-2), vec3(scene_scale * 0.75) * 2.0, vec3(0,0,1), 135.0, Material(vec3(1), vec3(0), 0.0, 2, eta2), scene);
 }
 
 // FUNCTIONS RENDERING
@@ -600,26 +372,27 @@ highp vec3 rand3() {
 	return fract(sin(vec3(seed+=0.1,seed+=0.1,seed+=0.1))*vec3(43758.5453123,22578.1459123,19642.3490423));
 }
 
-vec3 sample_cosine(in Intersection inter, inout float pdf) {
+vec3 sample_cosine(in Intersection inter, inout float pdf, inout vec3 new_dir_local) {
 	highp float phi = rand1() * 2.0 * PI;
 	highp float theta = acos(sqrt(1.0 - rand1()));
 	float sintheta = sin(theta);
-	float costheta = cos(theta);
-	vec3 sampled = vec3(sintheta * cos(phi), sintheta * sin(phi), costheta);
+	float costheta = abs(cos(theta));
+	new_dir_local = vec3(sintheta * cos(phi), sintheta * sin(phi), costheta);
 
-	if(!sameHemisphere(inter.normal, sampled))
-		sampled *= -1.0;
+	if(!sameHemisphere(inter.normal, new_dir_local))
+		new_dir_local *= -1.0;
 	pdf = costheta / PI;
-	return sampled;
+	return inter.material.albedo / PI;
 }
 
-vec3 sample_mirror(in Intersection inter, inout float pdf) {
-	vec3 sampled = reflection(-normalize(inter.ray.direction), inter.normal);
-
-	if(!sameHemisphere(inter.normal, sampled))
-		sampled *= -1.0;
+vec3 sample_mirror(in Intersection inter, inout float pdf, inout vec3 new_dir_local) {
+	new_dir_local = reflection(-normalize(inter.ray.direction), inter.normal);
 	pdf = 1.0;
-	return sampled;
+	if(!sameHemisphere(inter.normal, new_dir_local))
+		new_dir_local *= -1.0;
+
+	float acostheta = abs(normalize(new_dir_local.z));
+	return inter.material.albedo / acostheta;
 }
 
 // See https://pbr-book.org/3ed-2018/Reflection_Models/Specular_Reflection_and_Transmission
@@ -650,10 +423,10 @@ float FrDielectric(float cosThetaI, float etaI, float etaT) {
 	return (Rparl * Rparl + Rperp * Rperp) / 2.0;
 }
 
-vec3 sample_fresnel(in Intersection inter, inout float pdf) {
-	vec3 sampled;
+vec3 sample_fresnel(in Intersection inter, inout float pdf, inout vec3 new_dir_local) {
 	float cost = dot(-inter.ray.direction, inter.normal);
 	float eta1 = inter.ray.eta, eta2 = inter.material.eta;
+	vec3 f = vec3(1);
 
 	bool entering = cost > 0.0; // does not work for triangles that are not oriented correctly
 	//bool entering = eta1 != eta2; // more robust in many case but imperfect
@@ -664,26 +437,29 @@ vec3 sample_fresnel(in Intersection inter, inout float pdf) {
 	}
 
 	float fresnel_term = FrDielectric(cost, eta1, eta2);
-	pdf = 1.0;
 
 	if(rand1() > fresnel_term){
+		// Refract
 		float eta = eta1/eta2;
 		float sin2ThetaI = max(0.0, 1.0 - cost * cost);
 		float sin2ThetaT = eta * eta * sin2ThetaI;
 		// Handle total internal reflection for transmission
 		if (sin2ThetaT >= 1.0) return vec3(0);
 		float cosThetaT = sqrt(1.0 - sin2ThetaT);
-		sampled = eta * -(-inter.ray.direction) + (eta * cost - cosThetaT) * inter.normal;
+		new_dir_local = normalize(eta * -(-inter.ray.direction) + (eta * cost - cosThetaT) * inter.normal);
 
-		pdf *= 1.0 / (1.0 - fresnel_term);
+		f *= (1.0 - fresnel_term) / abs(cosThetaT);
+		pdf = 1.0;
 	}
 	else {
-		pdf *= 1.0 / fresnel_term;
+		// Reflect
+		f *= fresnel_term * abs(cost); // cos theta_in same as cos theta_out
+		pdf = 1.0;
 		float void_pdf;
-		return sample_mirror(inter, void_pdf);
+		sample_mirror(inter, void_pdf, new_dir_local);
 	}
 
-	return normalize(sampled);
+	return f * inter.material.albedo;
 }
 
 void createCoordinateSystem(in vec3 normal, out vec3 Nt, out vec3 Nb) {
@@ -769,112 +545,40 @@ vec3 wvl_to_rgb(float wvl)
 	return vec3(red,green,blue);
 }
 
-void sample_BSDF(in Intersection inter, inout DirectionSample ds, inout vec3 beta_modifier){
+vec3 sample_BSDF(in Intersection inter, inout DirectionSample ds){
 	vec3 old_dir_world = normalize(-inter.ray.direction);
 	vec2 old_dir_world_spherical = cartesianToSpherical(old_dir_world);
 
 	vec3 old_dir_local = worldToLocal(inter.normal, old_dir_world);
 	vec2 old_dir_local_spherical = cartesianToSpherical(old_dir_local);
 
-	vec3 new_dir_local;
+	vec3 new_dir_local, f;
 
 	if(inter.material.bsdf_number == 0)
-		new_dir_local = sample_cosine(inter, ds.pdf);
+		f = sample_cosine(inter, ds.pdf, new_dir_local);
 	else if(inter.material.bsdf_number == 1)
-		new_dir_local = sample_mirror(inter, ds.pdf);
+		f = sample_mirror(inter, ds.pdf, new_dir_local);
 	else if(inter.material.bsdf_number == 2)
+		f = sample_fresnel(inter, ds.pdf, new_dir_local);
+	else if(inter.material.bsdf_number == 3)
 	{
 		// Spectral dispersion
-		if(true)
-		{
-			float picked_rnd = rand1();
-			float wvl_selection = picked_rnd * (750.0-350.0) + 350.0;
-			//int wvl_selection = int(floor(rand1() * 3.0));
+		float picked_rnd = rand1();
+		float wvl_selection = picked_rnd * (750.0-350.0) + 350.0;
 
-			if (inter.material.eta == 1.52 || inter.ray.eta == 1.52)
-			{
-				// GLASS
-				float new_eta = 1.52;
-				float old_eta = inter.material.eta;
+		f = wvl_to_rgb(wvl_selection);
 
-
-				// if (wvl_selection == 0)
-				// {
-				// 	new_eta = 1.5145; // 650nm
-				// 	//new_eta = 1.01; // 650nm
-				// 	beta_modifier = vec3(1, 0, 0);
-				// }
-				// if (wvl_selection == 1)
-				// {
-				// 	new_eta = 1.5208; // 510nm
-				// 	//new_eta = 50.0; // 510nm
-				// 	beta_modifier = vec3(0, 1, 0);
-				// }
-				// if (wvl_selection == 2)
-				// {
-				// 	new_eta = 1.5228; // 480nm
-				// 	//new_eta = 100.0; // 480nm
-				// 	beta_modifier = vec3(0, 0, 1);
-				// }
-				//
-				// beta_modifier = beta_modifier*3.0;
-
-				// if (wvl_selection <= 483.333)
-				// {
-				// 	beta_modifier = vec3(1, 0, 0);
-				// }
-				// if (wvl_selection > 483.333 && wvl_selection < 666.666)
-				// {
-				// 	beta_modifier = vec3(0, 1, 0);
-				// }
-				// if (wvl_selection >= 666.666)
-				// {
-				// 	beta_modifier = vec3(0, 0, 1);
-				// }
-
-				beta_modifier = wvl_to_rgb(wvl_selection);
-
-				// new_eta = picked_rnd * 0.5 + 1.0;
-				//new_eta = picked_rnd * (1.5228 - 1.5145) + 1.5145;
-				new_eta = picked_rnd * (3.4 - 1.5) + 1.5;
-				// beta_modifier = beta_modifier*(750.0-350.0);
-
-				// new_eta = picked_rnd * (4.0 - 1.5) + 1.5;
-				// new_eta = picked_rnd * (old_eta * 2.0 - old_eta - 0.5) + old_eta - 0.5;
-
-				if (inter.material.eta == 1.52)
-				{
-					inter.material.eta = new_eta;
-				}
-				else
-				{
-					inter.ray.eta = new_eta;
-				}
-			}
-		}
-		new_dir_local = sample_fresnel(inter, ds.pdf);
+		float new_eta = picked_rnd * (6.6 - 2.0) + 2.0;
+		inter.material.eta = new_eta;
+		f *= sample_fresnel(inter, ds.pdf, new_dir_local);
 	}
+	if (ds.pdf == 0.0) return vec3(0);
 
 	vec3 new_dir_world = localToWorld(new_dir_local);
 	// new_dir_world = new_dir_local;
 
 	ds.direction = new_dir_world;
-	ds.bsdf = BSDF(inter.material, old_dir_local_spherical, cartesianToSpherical(new_dir_local));
-}
-
-void sample_BSDF_without_world_recalibration(in Intersection inter, inout DirectionSample ds){
-	vec3 old_dir = normalize(-inter.ray.direction);
-	vec2 old_dir_spherical = cartesianToSpherical(old_dir);
-	vec3 new_dir;
-	if(inter.material.bsdf_number == 0)
-		new_dir = sample_cosine(inter, ds.pdf);
-	else if(inter.material.bsdf_number == 1)
-		new_dir = sample_mirror(inter, ds.pdf);
-	else if(inter.material.bsdf_number == 2)
-		new_dir = sample_fresnel(inter, ds.pdf);
-
-	ds.direction = new_dir;
-	ds.bsdf = BSDF(inter.material, old_dir_spherical, cartesianToSpherical(new_dir));
+	return f;
 }
 
 // Sampling from pbrt
@@ -903,14 +607,14 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	float d = length(main_direction);
 	main_direction /= d;
 	float d2 = d*d;
-	float sinthetamax = sphere.radius /d;
+	float sinthetamax = sphere.radius / d;
 
 	// float thetamax = asin(sinthetamax);
-	float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax);//cos(thetamax);
+	float costhetamax = sqrt(1.0 - sinthetamax * sinthetamax); //cos(thetamax);
 
-	highp float costheta = 1.0 - rand1()  * (1.0 - costhetamax);
+	highp float costheta = 1.0 - rand1() * (1.0 - costhetamax);
 
-	float sintheta = sqrt(1.0 - costheta * costheta);//sin(acos(costheta))
+	float sintheta = sqrt(1.0 - costheta * costheta); //sin(acos(costheta))
 	highp float phi = rand1() * TWO_PI;
 
 	// D = 1 - d² sin² θ / r²
@@ -921,10 +625,10 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	float cosalpha = float(D_positive) * (sintheta2 / sinthetamax + costheta * sqrt(abs(D)))
 					+ float(!D_positive) * sinthetamax;
 
-	float sinalpha = sin(acos(cosalpha));//sqrt(1.0 - cosalpha * cosalpha);
+	float sinalpha = sin(acos(cosalpha)); //sqrt(1.0 - cosalpha * cosalpha);
 
 	vec3 direction = vec3(sinalpha * cos(phi), sinalpha * sin(phi), cosalpha);
-	if(abs(main_direction.z) > 0.99999){
+	if(abs(main_direction.z) > (1.0 - epsilon)){
 		sls.normal = direction * sign(main_direction.z);
 	}
 	else{
@@ -938,99 +642,93 @@ void sampleSphereSA(vec3 viewer, in Sphere sphere, inout SurfaceLightSample sls)
 	sls.pdf = 1.0 / solid_angle;
 }
 
-vec3 computeIllumination(in Scene scene, in Intersection inter, in SurfaceLightSample sls, in vec3 Le, in bool from_area_to_SA) {
-	float pdf_light = sls.pdf / float(scene.nbLightSpheres); // dividing because using sampleOneLight
+vec3 estimateDirect(in Intersection inter, in SurfaceLightSample sls, in vec3 Le, in bool from_area_to_SA) {
+	float pdf_light = sls.pdf;// / float(u_lights); // dividing because using sampleOneLight
 	vec3 pointToSample = sls.point - inter.point;
-	pointToSample = normalize(pointToSample);
+	vec3 pointToSample_normalized = normalize(pointToSample);
 
-	float bsdf = BSDF(inter.material, cartesianToSpherical(-inter.ray.direction), cartesianToSpherical(pointToSample));
-	float cosi = abs(dot(inter.normal, pointToSample));
-	vec3 prod = bsdf * cosi * inter.material.albedo; // bounce toward light prod, called f in pbrt
-
-	if (isNan(prod[0]) || isNan(prod[1]) || isNan(prod[2])) prod = vec3(0); // Sub optimal fix
-
-	if(!isBlack(prod)) {
-		Ray ray_light = Ray(inter.point + pointToSample * epsilon, pointToSample, 1.0); // Better correlates with naive
-		// Ray ray_light = Ray(inter.point + inter.normal * epsilon, pointToSample, 1.0); // Ray origin is shifted along normal instead of pointToSample
-
-		if(from_area_to_SA) {
+	if(!isNan(pdf_light) && pdf_light != 0.0 && !isNan(Le[0]) && !isNan(Le[1]) && !isNan(Le[2]) && !isBlack(Le)) {
+		vec3 bsdf = inter.material.albedo * BSDF(inter.material, cartesianToSpherical(-inter.ray.direction), cartesianToSpherical(pointToSample));
+		float cosi = abs(dot(inter.normal, pointToSample_normalized));
+		vec3 f = bsdf * cosi; // bounce toward light f, called f in pbrt
+		if (!isNan(f[0]) && !isNan(f[1]) && !isNan(f[2]) && !isBlack(f))
+		{
 			float dist = length(pointToSample);
-			float cosl = abs(dot(sls.normal, -normalize(pointToSample)));
-			float SA_to_area = (dist*dist) / cosl;
-			pdf_light *= SA_to_area;
+			if(from_area_to_SA) {
+				float cosl = abs(dot(sls.normal, -pointToSample_normalized));
+				float SA_to_area = (dist*dist) / cosl;
+				pdf_light *= SA_to_area;
+				// if (pdf_light > 1000000.0) return vec3(0.0);
+			}
+
+			Ray ray_light = Ray(inter.point + pointToSample_normalized * epsilon, pointToSample_normalized, 1.0); // Better correlates with naive
+			// Ray ray_light = Ray(inter.point + inter.normal * epsilon, pointToSample_normalized, 1.0); // Ray origin is shifted along normal instead of pointToSample
+			float V = float(visibility(ray_light, sls.point));
+			return V * Le * f / pdf_light;
 		}
-
-		float V = float(visibility(ray_light, scene, sls.point));
-		vec3 Li = V * Le;
-
-		vec3 color_current_light =  Li * prod;
-		return color_current_light;
 	}
+	return vec3(0);
 }
 
-vec3 sampleAllLights(in Scene scene, in Intersection inter){
+vec3 sampleOneLight(in Intersection inter){
 	vec3 Li_all;
 	SurfaceLightSample sls;
 
-	// Sample light spheres
-	for (int k = 0; k < MAXSPHERES; ++k)
-		if(k <= scene.nbLightSpheres) {
-			for (int l = 0; l < MAXSPHERES; ++l)
-				if(l == scene.light_spheres[k]) {
-					sampleSphereSA(inter.point, scene.spheres[l], sls); // pdf in Solid Angle
-					vec3 Le = scene.spheres[l].material.emissive;
-					Li_all += computeIllumination(scene, inter, sls, Le, false);
-				}
+	float attw = u_attrtexsize.r;
+	float atth = u_attrtexsize.g;
+
+	// Select
+	int selected = int(rand1() * float(u_lights));
+
+	// Find
+	int cnt = 0; // Counter for selecting ith light
+	for (int i = 0; i < MAX_OBJ_NUM; ++i){
+		if (i >= u_objnums)
+			break;
+		float fix = float(i);
+		float fiy = 0.0;
+		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
+
+		if (isBlack(emissive))
+			continue;
+		else if(cnt++ != selected)
+			continue;
+
+		int type = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).r);
+
+		const Material material = Material(vec3(0), vec3(0), 0.0, 0, 0.0);
+
+		if (type == 0)
+		{
+			vec3 position = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			float radius = 50.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).r); // radius is encoded differently to enhance precision
+			Sphere tmp = Sphere(position, radius, radius*radius, material);
+			sampleSphereSA(inter.point, tmp, sls); // pdf in Solid Angle
+			return float(u_lights) * estimateDirect(inter, sls, emissive, false);
 		}
+		else if (type == 1)
+		{
+			vec3 v1 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 1.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v2 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 2.0)/attw,fiy/atth)).rgb - 0.5);
+			vec3 v3 = 200.0 * (texture2D(u_attrtexture, vec2((7.0 * fix + 3.0)/attw,fiy/atth)).rgb - 0.5);
+			Triangle tmp = Triangle(v1, v2, v3, material);
 
-	// Sample light triangles
-	for (int k = 0; k < MAXTRIANGLES; ++k)
-		if(k <= scene.nbLightTriangles) {
-			for (int l = 0; l < MAXTRIANGLES; ++l)
-				if(l == scene.light_triangles[k]) {
-					sampleTriangleArea(inter.point, scene.triangles[l], sls); // pdf in Area converted to SA
-					vec3 Le = scene.triangles[l].material.emissive;
-					Li_all += computeIllumination(scene, inter, sls, Le, true);
-				}
+			sampleTriangleArea(inter.point, tmp, sls); // pdf in Area converted to SA
+			return float(u_lights) * estimateDirect(inter, sls, emissive, true);
 		}
-
-	// return Li_all / float(scene.nbLights);
-	return Li_all;
-}
-
-vec3 sampleOneLight(in Scene scene, in Intersection inter){
-	vec3 Li_all;
-	SurfaceLightSample sls;
-
-	int i = int(rand1() * float(scene.nbLights));
-	if(i < scene.nbLightSpheres) {
-		for (int k = 0; k < MAXSPHERES; ++k)
-			if(k == i) {
-				sampleSphereSA(inter.point, scene.spheres[k], sls); // pdf in Solid Angle
-				vec3 Le = scene.spheres[k].material.emissive;
-				Li_all += computeIllumination(scene, inter, sls, Le, false);
-			}
-	} else {
-		for (int k = 0; k < MAXTRIANGLES; ++k)
-			if(k == i) {
-				sampleTriangleArea(inter.point, scene.triangles[k], sls); // pdf in Area converted to SA
-				vec3 Le = scene.triangles[k].material.emissive;
-				Li_all += computeIllumination(scene, inter, sls, Le, true);
-			}
 	}
-	return Li_all;
 	// return Li_all / float(scene.nbLights);
 	// return Li_all * float(scene.nbLights);
 }
 
-vec3 traceNormals(in Ray ray, in Scene scene, bool xray) {
+vec3 traceNormals(in Ray ray, bool xray) {
 	vec3 res = vec3(0);
 	vec3 color_total;
 	if(u_iterations <= 0) {
 		Intersection inter;
 		inter = inter_dummy(ray);
 		for(float depth = 1.0; depth < 5.0; ++depth) {
-			raySceneIntersection(ray, scene, inter);
+			raySceneIntersection(ray, inter);
 			ray.origin = inter.point;
 			ray.direction += ray.direction*epsilon;
 			color_total += abs(inter.normal) / depth;
@@ -1046,14 +744,14 @@ vec3 traceNormals(in Ray ray, in Scene scene, bool xray) {
 	return res;
 }
 
-vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
+vec3 traceRay(in Ray ray, bool shadow) {
 	vec3 res = vec3(0);
 	vec3 color_total;
 	if(u_iterations <= PATHS_NB) {
 		Intersection inter;
 		inter = inter_dummy(ray);
-		if(raySceneIntersection(ray, scene, inter)) {
-			if(!isBlack(inter.material.emissive)) {
+		if(raySceneIntersection(ray, inter)) {
+			if(isEmissive(inter.material)) {
 				color_total += inter.material.emissive;
 			} else {
 				// Shadowed ?
@@ -1062,7 +760,7 @@ vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 				}
 				else
 				{
-					color_total += sampleAllLights(scene, inter);
+					color_total += sampleOneLight(inter);
 				}
 			}
 
@@ -1078,12 +776,11 @@ vec3 traceRay(in Ray ray, in Scene scene, bool shadow) {
 	return res;
 }
 
-vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
+vec3 tracePath(in Ray ray, bool naive, bool lastLight) {
 	// res is pixel color
 	// color_total is computed color (needs to be scaled based on u_iterations)
 	// beta is propagating color
 	vec3 res, color_total, beta = vec3(1);
-	bool spec_last = false; // last bounce was specular ?
 	bool spec_current = false;
 	DirectionSample ds;
 	ds.pdf = 1.0;
@@ -1093,38 +790,29 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 
 		for(int depth = 0; depth < MAX_DEPTH; ++depth) {
 			inter = inter_dummy(ray); // needed to init hit to false
-			if(raySceneIntersection(ray, scene, inter)) {
-				spec_current = inter.material.bsdf_number == 1 || inter.material.bsdf_number == 2;
+			if(raySceneIntersection(ray, inter)) {
 				// Emissive material
 				if(isEmissive(inter.material)) {
-					if(depth == 0 || naive || spec_last) {
+					if(depth == 0 || naive || spec_current) {
 						color_total += beta * inter.material.emissive; // lights do not have albedo // TODO: study different kind of lights
 					} else if(lastLight && depth < MAX_DEPTH-1) {
 						color_total += beta * inter.material.emissive;
 					}
-				} else if(!spec_current) {
-					// Light sampling
-					if(!naive) { // Iterative PT
-						// color_total += beta * sampleAllLights(scene, inter);
-						if(!lastLight || lastLight && depth == MAX_DEPTH-1) {
-							color_total += beta * sampleOneLight(scene, inter);
-						}
-					}
+				}
+				if(!naive && (!lastLight || lastLight && depth == MAX_DEPTH-1)) {
+					// color_total += beta * sampleAllLights(inter);
+					color_total += beta * sampleOneLight(inter);
 				}
 
 				// Surface sampling for next bounce
-				vec3 beta_modifier = vec3(1);
-				sample_BSDF(inter, ds, beta_modifier);
-				// sample_BSDF_without_world_recalibration(inter, ds);
-				spec_last = spec_current;
-				ray = Ray(inter.point + ds.direction*epsilon, ds.direction, inter.material.eta);
+				vec3 f = sample_BSDF(inter, ds);
+				if (isBlack(f) || ds.pdf == 0.0 || isNan(ds.pdf)) break;
 
 				float acost = abs(dot(ds.direction, inter.normal));
+				beta *= f * acost / ds.pdf; // beta propagates cosine, albedo and bsdf value through the path
 
-				beta *= acost * inter.material.albedo * beta_modifier; // beta propagates cosine, albedo and bsdf value through the path
-				if(!spec_last)
-					beta *= ds.bsdf / ds.pdf;
-				if(ds.pdf <= 0.0 || beta == vec3(0)) break; // No prod (skymap or light touched) or no prob (opposite hemisphere sampling)
+				spec_current = inter.material.bsdf_number == 1 || inter.material.bsdf_number == 2 || inter.material.bsdf_number == 3;
+				ray = Ray(inter.point + ds.direction*epsilon, ds.direction, inter.material.eta);
 			}
 			else {
 				break; // No intersect
@@ -1141,28 +829,31 @@ vec3 tracePath(in Ray ray, in Scene scene, bool naive, bool lastLight) {
 	return res;
 }
 
-Scene scene;
-
 void main() {
-	vec3 delta_p = vec3(11,0,0);
-		delta_p.x += u_keyboard.x;
-		delta_p.y += u_keyboard.y;
-		delta_p.z += u_keyboard.z;
+	vec3 delta_p = vec3(0,0,0);
+	delta_p.x += u_keyboard.x;
+	delta_p.y += u_keyboard.y;
+	delta_p.z += u_keyboard.z;
 	vec2 delta_r = vec2(0);
-		delta_r.x += u_mouse.x * rotation_speed;
-		delta_r.y += u_mouse.y * rotation_speed;
-	vec4 pos_spp = INITIAL_POS_SPP; //(memorized location)
-	vec4 rot_tech = INITIAL_ROT_TECH;
-	vec2 rot_tech_xy = rot_tech.xy;
+	delta_r.x += u_mouse.x * rotation_speed;
+	delta_r.y += u_mouse.y * rotation_speed;
 	vec2 uv_swap = v_uv;
 	uv_swap.x = -v_uv.x + 1.0;
 
-	//initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	initSceneRefract(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r, false);
-	//if(u_scene == 0)
-	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
-	//else
-	//	initSceneCornell(scene, pos_spp.xyz, delta_p, rot_tech_xy, delta_r);
+	// Initialize from attr
+	vec3 position = vec3(-15, -0.35, 0);
+	vec2 rotation = vec2(HALF_PI, 0);
+
+	rotation += delta_r;
+	vec3 front = sphericalToCartesian(rotation);
+	vec3 right = normalize(cross(UP, front));
+
+	position += front * delta_p.x;
+	position += right * delta_p.y;
+	position.z += delta_p.z;
+
+	vec2 cplane = vec2(u_texsize.r,u_texsize.g) / ((u_texsize.r+u_texsize.g)/2.0);
+	Camera camera = makeCameraFromFrontRight(position, front, right, cplane);
 
 	vec3 color;
 
@@ -1177,20 +868,20 @@ void main() {
 		else if(u_random_mode == 3)
 			seed = u_time;
 
-		Ray ray = makeRay(uv_swap, scene.camera);
+		Ray ray = makeRay(uv_swap, camera);
 		vec3 tmp;
 		if (u_render_mode == -1)
-			tmp = traceNormals(ray, scene, false); // Normals
+			tmp = traceNormals(ray, false); // Normals
 		else if (u_render_mode == 0)
-			tmp = traceRay(ray, scene, false); // Raytracing
+			tmp = traceRay(ray, false); // Raytracing
 		else if (u_render_mode == 1)
-			tmp = traceRay(ray, scene, true); // Raytracing shadowed
+			tmp = traceRay(ray, true); // Raytracing shadowed
 		else if (u_render_mode == 2)
-			tmp = tracePath(ray, scene, true, false); // Path tracing naive
+			tmp = tracePath(ray, true, false); // Path tracing naive
 		else if (u_render_mode == 3)
-			tmp = tracePath(ray, scene, false, true); // Path tracing last (sample light on last vertex)
+			tmp = tracePath(ray, false, true); // Path tracing last (sample light on last vertex)
 		else if (u_render_mode == 4)
-			tmp = tracePath(ray, scene, false, false); // Path tracing iterative (sample light on all vertices)
+			tmp = tracePath(ray, false, false); // Path tracing iterative (sample light on all vertices)
 		if(isColor(tmp))
 			color += tmp;
 	}
