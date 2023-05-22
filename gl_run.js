@@ -381,7 +381,7 @@ function initDefaultScene() {
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [1.0, 0.6, 0.6],
+		obj_emissive: [1.0, 0.2, 0.2],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
@@ -394,7 +394,7 @@ function initDefaultScene() {
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [0.6, 1.0, 0.6],
+		obj_emissive: [0.2, 1.0, 0.2],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
@@ -407,7 +407,7 @@ function initDefaultScene() {
 		obj_v3: [0, 0, 0],
 		obj_bsdf_number: 0,
 		obj_albedo: [1, 1, 1],
-		obj_emissive: [0.6, 0.6, 1.0],
+		obj_emissive: [0.2, 0.2, 1.0],
 		obj_eta: 1.0,
 		obj_shininess: 0,
 	});
@@ -609,18 +609,31 @@ function initDefaultScene() {
 function initObjScene() {
 	DefaultDatas = [];
 
-	DefaultDatas.push({
-		obj_type: 0,
-		obj_textureType: 0,
-		obj_v1: [-2, -5, 5],
-		obj_v2: [(3 - 5) * 2, 0, 0],
-		obj_v3: [0, 0, 0],
-		obj_bsdf_number: 0,
-		obj_albedo: [1, 1, 1],
-		obj_emissive: [1.0, 0.6, 0.6],
-		obj_eta: 1.0,
-		obj_shininess: 0,
-	});
+	// DefaultDatas.push({
+	// 	obj_type: 0,
+	// 	obj_textureType: 0,
+	// 	obj_v1: [-2, -5, 5],
+	// 	obj_v2: [(3 - 5) * 2, 0, 0],
+	// 	obj_v3: [0, 0, 0],
+	// 	obj_bsdf_number: 0,
+	// 	obj_albedo: [1, 1, 1],
+	// 	obj_emissive: [1.0, 0.6, 0.6],
+	// 	obj_eta: 1.0,
+	// 	obj_shininess: 0,
+	// });
+
+	addQuad(
+		/* datas */ DefaultDatas,
+		/* position */ glMatrix.vec3.fromValues(0, 0, 4),
+		/* scale */ glMatrix.vec2.fromValues(0.5, 1),
+		/* axis */ glMatrix.vec3.fromValues(0, 0, 1),
+		/* angle */ 0,
+		/* obj_bsdf_number */ 0,
+		/* obj_albedo */ glMatrix.vec3.fromValues(1, 1, 1),
+		/* obj_emissive */ glMatrix.vec3.fromValues(10, 10, 10),
+		/* obj_eta */ 1.0,
+		/* obj_shininess */ 0
+	);
 
 	let s = 3;
 	for (let i = 0; i < faces.length; ++i) {

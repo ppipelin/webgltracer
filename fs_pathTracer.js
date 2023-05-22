@@ -307,7 +307,7 @@ bool raySceneIntersection(in Ray ray, inout Intersection inter){
 		float fix = float(inter_selected);
 		float fiy = 0.0;
 		vec3 albedo = texture2D(u_attrtexture, vec2((7.0 * fix + 4.0)/attw,fiy/atth)).rgb;
-		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
+		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb * 10.0;
 		float eta = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).r * 10.0;
 		float shininess = texture2D(u_attrtexture, vec2((7.0 * fix + 6.0)/attw,fiy/atth)).g;
 		int bsdf_number = int(texture2D(u_attrtexture, vec2((7.0 * fix)/attw,fiy/atth)).b * 3.0);
@@ -687,7 +687,7 @@ vec3 sampleOneLight(in Intersection inter){
 			break;
 		float fix = float(i);
 		float fiy = 0.0;
-		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb;
+		vec3 emissive = texture2D(u_attrtexture, vec2((7.0 * fix + 5.0)/attw,fiy/atth)).rgb * 10.0;
 
 		if (isBlack(emissive))
 			continue;
