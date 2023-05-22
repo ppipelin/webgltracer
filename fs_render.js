@@ -47,7 +47,7 @@ void main(void)
 {
 	gl_FragColor = texture2D(u_texture, v_texCoord);
 
-	gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 20.0, -0.8);
+	gl_FragColor.rgb = ExposureCorrect(gl_FragColor.rgb, 2.1, -0.8);
 	gl_FragColor.rgb = ACESFilmicToneMapping(gl_FragColor.rgb);
 }
 `;
