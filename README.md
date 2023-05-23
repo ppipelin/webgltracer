@@ -22,17 +22,20 @@ Objects' information are stored in a texture so that it is read in the shader fr
 
 |Pixel | Object's Parameter
 |---------|----------------------
-|0 | `Objtype, Texturetype, BSDF Number`
-|1 | `Vertex1.x, Vertex1.y, Vertex1.z`
-|2 | `Vertex2.x, Vertex2.y, Vertex2.z`
-|3 | `Vertex3.x, Vertex3.y, Vertex3.z`
-|4 | `Albedo.r, Albedo.g, Albedo.b`
-|5 | `Emissive.r, Emissive.g, Emissive.b`
-|6 | `Refractive Index, Shininess, empty`
+|0 | `Objtype`, `Texturetype`, `BSDF Number`
+|1 | `Vertex1.x`, `Vertex1.y`, `Vertex1.z`
+|2 | `Vertex2.x`, `Vertex2.y`, `Vertex2.z`
+|3 | `Vertex3.x`, `Vertex3.y`, `Vertex3.z`
+|4 | `Albedo.r`, `Albedo.g`, `Albedo.b`
+|5 | `Emissive.r`, `Emissive.g`, `Emissive.b`
+|6 | `Refractive Index`, `Shininess`, `empty`
+
+For sphere Objtype use `Vertex1` for position and `Vertex2.x` for radius.
 
 ### Path tracer
 
 ### UI
+Navigation : WASD/ZQSD + CTRL + SHIFT
 
 ---
 
