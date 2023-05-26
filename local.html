@@ -92,20 +92,14 @@
 
 		<ul>
 			<li>Fix imperfect handling of pdf for specular</li>
-			<li>Path tracing -- Naive OK, Iterative TOCHECK --> Light sampling method seems to introduce bias</li>
-			<li>Emissive triangles -- almost finished</li>
-			<li>Optical polisehd materials -- WIP --> triangles OK, verify spheres</li>
+			<li>Some GPU do not compute sphere visibility properly which introduces a bias for iterative</li>
 			<li>CT GGX</li>
-			<li>Scene changing -- WIP --> problem at compile, seems to be related to shader's length</li>
 			<li>Light tracing</li>
-			<li>Import/export renders using 0-loss format</li>
 			<li>Moving objects</li>
 			<li>Anisotropy</li>
-			<li>Wavelength support</li>
-			<li>Iridescent material</li>
-			<li>Import blender scene</li>
+			<li>Improve diffractive fresnel</li>
 		</ul>
-		Frambebuffer saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>. Will probably mimic camera as well
+		Frambebuffer saving and scene saving method inspired by <a href="https://wulinjiansheng.github.io/WebGL_PathTracer/" target="_blank">https://wulinjiansheng.github.io/WebGL_PathTracer/</a>.
 		which is pretty good. <br>
 		Structs & intersection methods from <a href="https://www.shadertoy.com/view/wlyGWc" target="_blank">https://www.shadertoy.com/view/wlyGWc</a>.
 	</div>
